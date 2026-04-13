@@ -26,17 +26,22 @@ function SortableTeamItem({ team, index, total, onRemove, onMoveUp, onMoveDown }
   }
 
   return (
-    <li ref={setNodeRef} style={style} className="rounded-md border border-[var(--rh-border)] bg-white p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="font-semibold">{team.displayName}</p>
-          <p className="text-xs text-[var(--rh-muted)]">Priority #{team.priorityRank}</p>
+    <li ref={setNodeRef} style={style} className="rounded-[1.25rem] border border-[color:var(--rh-border)] bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgb(150_29_55_/_10%)] text-sm font-black text-[color:var(--rh-primary)]">
+            {team.priorityRank}
+          </div>
+          <div>
+            <p className="text-base font-bold tracking-[-0.02em]">{team.displayName}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[color:var(--rh-muted-soft)]">Priority #{team.priorityRank}</p>
+          </div>
         </div>
-        <div className="flex gap-1">
-          <button type="button" className="rounded border px-2 py-1 text-xs" onClick={onMoveUp} disabled={index === 0}>Up</button>
-          <button type="button" className="rounded border px-2 py-1 text-xs" onClick={onMoveDown} disabled={index === total - 1}>Down</button>
-          <button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => onRemove(team.teamId)}>Remove</button>
-          <button type="button" className="rounded border px-2 py-1 text-xs" {...attributes} {...listeners} aria-label={`Drag ${team.displayName}`}>Drag</button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="rh-button-secondary px-3 py-2 text-xs" onClick={onMoveUp} disabled={index === 0}>Up</button>
+          <button type="button" className="rh-button-secondary px-3 py-2 text-xs" onClick={onMoveDown} disabled={index === total - 1}>Down</button>
+          <button type="button" className="rh-button-secondary px-3 py-2 text-xs" onClick={() => onRemove(team.teamId)}>Remove</button>
+          <button type="button" className="rh-button-secondary px-3 py-2 text-xs" {...attributes} {...listeners} aria-label={`Drag ${team.displayName}`}>Drag</button>
         </div>
       </div>
     </li>
@@ -67,7 +72,7 @@ export function PriorityTeamList({ teams, onRemove, onReorder }: PriorityTeamLis
       }}
     >
       <SortableContext items={teams.map((team) => team.teamId)} strategy={verticalListSortingStrategy}>
-        <ul data-testid="config-team-list" className="space-y-2">
+        <ul data-testid="config-team-list" className="space-y-3">
           {teams.map((team, index) => (
             <SortableTeamItem
               key={team.teamId}

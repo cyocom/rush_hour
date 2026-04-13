@@ -1,43 +1,386 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
+import styled from 'styled-components'
 
 interface PageShellProps {
   title: string
   subtitle: string
+  eyebrow?: string
   children: ReactNode
 }
 
-export function PageShell({ title, subtitle, children }: PageShellProps) {
+const Shell = styled.div`
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 10% 10%, rgb(150 29 55 / 0.22), transparent 24%),
+    radial-gradient(circle at 85% 0%, rgb(255 184 0 / 0.08), transparent 22%),
+    linear-gradient(180deg, #0b0d10 0%, #101216 52%, #12151b 100%);
+`;
+
+const Backdrop = styled.div`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgb(255 255 255 / 0.02) 1px, transparent 1px),
+    linear-gradient(rgb(255 255 255 / 0.02) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(180deg, rgb(0 0 0 / 0.55), transparent 92%);
+`;
+
+const Frame = styled.div`
+  position: relative;
+  z-index: 1;
+  width: min(1440px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 32px;
+
+  @media (max-width: 900px) {
+    width: min(100vw - 20px, 100%);
+    padding-top: 16px;
+  }
+`;
+
+const AppGrid = styled.div`
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px;
+
+  @media (max-width: 1100px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const Sidebar = styled.aside`
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: linear-gradient(180deg, rgb(19 21 27 / 0.98), rgb(14 16 21 / 0.94));
+  color: white;
+  border-radius: 32px;
+  padding: 24px;
+  box-shadow: 0 30px 70px rgb(0 0 0 / 0.28);
+
+  @media (max-width: 1100px) {
+    position: static;
+  }
+`;
+
+const Brand = styled.div`
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+`;
+
+const BrandKicker = styled.p`
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgb(255 221 228 / 0.75);
+`;
+
+const BrandTitle = styled.h2`
+  margin: 14px 0 0;
+  font-size: 29px;
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+  font-weight: 900;
+`;
+
+const BrandBody = styled.p`
+  margin: 14px 0 0;
+  color: rgb(235 235 240 / 0.68);
+  line-height: 1.6;
+  font-size: 14px;
+`;
+
+const SideNav = styled.nav`
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+`;
+
+const NavMeta = styled.div`
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+`;
+
+const MetaCard = styled.div`
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(255 255 255 / 0.04);
+  border-radius: 22px;
+  padding: 16px;
+`;
+
+const MetaLabel = styled.p`
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.5);
+`;
+
+const MetaValue = styled.p`
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+`;
+
+const Main = styled.div`
+  min-width: 0;
+`;
+
+const Hero = styled.header`
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background:
+    radial-gradient(circle at top right, rgb(150 29 55 / 0.18), transparent 28%),
+    linear-gradient(180deg, rgb(245 237 226 / 0.96), rgb(237 229 216 / 0.92));
+  border-radius: 32px;
+  padding: 28px;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.18);
+`;
+
+const HeroTop = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+
+  @media (max-width: 900px) {
+    flex-direction: column;
+  }
+`;
+
+const HeroEyebrow = styled.p`
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgb(150 29 55);
+`;
+
+const HeroContext = styled.p`
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(87 81 74);
+`;
+
+const HeroTitle = styled.h1`
+  margin: 14px 0 0;
+  font-size: clamp(3rem, 5vw, 5.25rem);
+  line-height: 0.92;
+  letter-spacing: -0.08em;
+  font-weight: 900;
+  color: #0a0a0a;
+`;
+
+const HeroSubtitle = styled.p`
+  margin: 18px 0 0;
+  max-width: 760px;
+  font-size: 18px;
+  line-height: 1.65;
+  color: rgb(79 75 69);
+`;
+
+const ChipRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+`;
+
+const Chip = styled.span`
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgb(183 172 158);
+  background: rgb(255 255 255 / 0.68);
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(90 82 74);
+`;
+
+const HeroStatRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 280px;
+
+  @media (max-width: 900px) {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const HeroStat = styled.div`
+  border-radius: 22px;
+  background: rgb(255 255 255 / 0.7);
+  border: 1px solid rgb(202 192 180);
+  padding: 16px;
+`;
+
+const HeroStatLabel = styled.p`
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(110 102 93);
+`;
+
+const HeroStatValue = styled.p`
+  margin: 10px 0 0;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  color: #0a0a0a;
+`;
+
+const StyledNavLink = styled(NavLink)`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 18px;
+  padding: 14px 16px;
+  color: rgb(255 255 255 / 0.78);
+  border: 1px solid transparent;
+  background: transparent;
+  transition: 180ms ease;
+
+  &:hover {
+    background: rgb(255 255 255 / 0.05);
+    border-color: rgb(255 255 255 / 0.08);
+    color: white;
+  }
+
+  &.active {
+    background: linear-gradient(135deg, rgb(150 29 55), rgb(184 48 82));
+    border-color: rgb(255 255 255 / 0.08);
+    color: white;
+    box-shadow: 0 16px 32px rgb(150 29 55 / 0.3);
+  }
+`;
+
+const NavLabelGroup = styled.div`
+  display: grid;
+  gap: 3px;
+`;
+
+const NavTitle = styled.span`
+  font-size: 15px;
+  font-weight: 800;
+`;
+
+const NavDescription = styled.span`
+  font-size: 12px;
+  color: currentColor;
+  opacity: 0.72;
+`;
+
+const NavBadge = styled.span`
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+`;
+
+export function PageShell({ title, subtitle, eyebrow = 'Rushhour Watchdesk', children }: PageShellProps) {
   return (
-    <div className="mx-auto min-h-screen w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
-      <header className="mb-6 rounded-panel border border-[var(--rh-border)] bg-[var(--rh-surface-raised)] p-5 shadow-panel">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--rh-primary)]">Rushhour Watchdesk</p>
-        <h1 className="mt-2 text-3xl font-bold text-[var(--rh-secondary)]">{title}</h1>
-        <p className="mt-2 text-sm text-[var(--rh-muted)]">{subtitle}</p>
-        <nav className="mt-5 flex gap-2" aria-label="Primary">
-          <NavLink
-            to="/watch"
-            className={({ isActive }) =>
-              `rounded-md px-3 py-2 text-sm font-medium ${
-                isActive ? 'bg-[var(--rh-primary)] text-[var(--rh-primary-ink)]' : 'bg-white text-[var(--rh-secondary)]'
-              }`
-            }
-          >
-            Watch
-          </NavLink>
-          <NavLink
-            to="/config"
-            className={({ isActive }) =>
-              `rounded-md px-3 py-2 text-sm font-medium ${
-                isActive ? 'bg-[var(--rh-primary)] text-[var(--rh-primary-ink)]' : 'bg-white text-[var(--rh-secondary)]'
-              }`
-            }
-          >
-            Config
-          </NavLink>
-        </nav>
-      </header>
-      {children}
-    </div>
+    <Shell>
+      <Backdrop />
+      <Frame>
+        <AppGrid>
+          <Sidebar>
+            <Brand>
+              <BrandKicker>FRC operator panel</BrandKicker>
+              <BrandTitle>FRC watch control</BrandTitle>
+              <BrandBody>
+                Prioritize teams, watch upcoming match windows, and surface conflicts before the stream gets busy.
+              </BrandBody>
+            </Brand>
+
+            <SideNav aria-label="Primary">
+              <StyledNavLink to="/watch">
+                <NavLabelGroup>
+                  <NavTitle>Watch</NavTitle>
+                  <NavDescription>Live monitoring desk</NavDescription>
+                </NavLabelGroup>
+                <NavBadge>01</NavBadge>
+              </StyledNavLink>
+              <StyledNavLink to="/config">
+                <NavLabelGroup>
+                  <NavTitle>Config</NavTitle>
+                  <NavDescription>Priority queue editor</NavDescription>
+                </NavLabelGroup>
+                <NavBadge>02</NavBadge>
+              </StyledNavLink>
+            </SideNav>
+
+            <NavMeta>
+              <MetaCard>
+                <MetaLabel>Input source</MetaLabel>
+                <MetaValue>Mock schedule only</MetaValue>
+              </MetaCard>
+              <MetaCard>
+                <MetaLabel>Memory model</MetaLabel>
+                <MetaValue>Browser session scoped</MetaValue>
+              </MetaCard>
+            </NavMeta>
+          </Sidebar>
+
+          <Main>
+            <Hero>
+              <HeroTop>
+                <div>
+                  <HeroEyebrow>Rushhour Watchdesk</HeroEyebrow>
+                  <HeroContext>{eyebrow}</HeroContext>
+                  <HeroTitle>{title}</HeroTitle>
+                  <HeroSubtitle>{subtitle}</HeroSubtitle>
+                  <ChipRow>
+                    <Chip>Mock broadcast</Chip>
+                    <Chip>Session memory</Chip>
+                    <Chip>Responsive layout</Chip>
+                  </ChipRow>
+                </div>
+                <HeroStatRow>
+                  <HeroStat>
+                    <HeroStatLabel>Mode</HeroStatLabel>
+                    <HeroStatValue>Live</HeroStatValue>
+                  </HeroStat>
+                  <HeroStat>
+                    <HeroStatLabel>Theme</HeroStatLabel>
+                    <HeroStatValue>Desk</HeroStatValue>
+                  </HeroStat>
+                  <HeroStat>
+                    <HeroStatLabel>State</HeroStatLabel>
+                    <HeroStatValue>Ready</HeroStatValue>
+                  </HeroStat>
+                </HeroStatRow>
+              </HeroTop>
+            </Hero>
+            {children}
+          </Main>
+        </AppGrid>
+      </Frame>
+    </Shell>
   )
 }

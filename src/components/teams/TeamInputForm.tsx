@@ -18,24 +18,27 @@ export function TeamInputForm({ error, onSubmit }: TeamInputFormProps) {
   }
 
   return (
-    <form data-testid="config-team-input" className="space-y-2" onSubmit={handleSubmit}>
-      <label className="block text-sm font-semibold" htmlFor="team-id">Team identifier</label>
-      <div className="flex gap-2">
+    <form data-testid="config-team-input" className="space-y-3" onSubmit={handleSubmit}>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <label className="block text-sm font-semibold" htmlFor="team-id">Team identifier</label>
+        <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--rh-muted-soft)]">Session-scoped priority feed</p>
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row">
         <input
           id="team-id"
           value={teamId}
           onChange={(event) => setTeamId(event.target.value)}
-          className="w-full rounded-md border border-[var(--rh-border)] bg-white px-3 py-2"
+          className="rh-input"
           placeholder="frc254"
         />
         <button
           type="submit"
-          className="rounded-md bg-[var(--rh-primary)] px-4 py-2 text-sm font-semibold text-[var(--rh-primary-ink)]"
+          className="rh-button-primary shrink-0"
         >
           Add
         </button>
       </div>
-      {error ? <p className="text-sm text-[var(--rh-primary)]">{error}</p> : null}
+      {error ? <p className="text-sm font-medium text-[var(--rh-primary)]">{error}</p> : null}
     </form>
   )
 }

@@ -2,11 +2,16 @@
   --rh-primary: rgb(150 29 55);
   --rh-primary-ink: rgb(252 241 244);
   --rh-secondary: #0a0a0a;
+  --rh-secondary-soft: #1c1d22;
   --rh-surface: #f5f1e9;
   --rh-surface-raised: #fffaf1;
+  --rh-surface-strong: #f0e7d9;
   --rh-border: #d6cfc0;
   --rh-muted: #4f4b45;
+  --rh-muted-soft: #71695d;
   --rh-focus: #0b6dff;
+  --rh-success: #1f7a53;
+  --rh-warning: #d97706;
   --rh-space-1: 0.25rem;
   --rh-space-2: 0.5rem;
   --rh-space-3: 0.75rem;
@@ -14,5 +19,8 @@
   --rh-space-5: 1.5rem;
   --rh-space-6: 2rem;
   --rh-radius: 0.75rem;
+  --rh-radius-lg: 1.5rem;
+  --rh-radius-xl: 2rem;
   --rh-shadow: 0 8px 18px rgb(10 10 10 / 12%);
+  --rh-shadow-lg: 0 20px 60px rgb(17 14 12 / 16%);
 }
