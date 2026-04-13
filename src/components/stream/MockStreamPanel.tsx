@@ -9,7 +9,7 @@ const Panel = styled.section`
     radial-gradient(circle at top right, rgb(150 29 55 / 0.22), transparent 26%),
     linear-gradient(180deg, #16171d 0%, #13151a 50%, #120f15 100%);
   color: white;
-  padding: 28px;
+  padding: 18px;
   box-shadow: 0 34px 80px rgb(0 0 0 / 0.3);
 `;
 
@@ -18,6 +18,10 @@ const TopRow = styled.div`
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
+
+  @media (max-width: 760px) {
+    flex-direction: column;
+  }
 `;
 
 const Kicker = styled.p`
@@ -37,14 +41,6 @@ const Title = styled.h2`
   font-weight: 900;
 `;
 
-const Body = styled.p`
-  margin: 16px 0 0;
-  max-width: 720px;
-  font-size: 18px;
-  line-height: 1.65;
-  color: rgb(255 255 255 / 0.72);
-`;
-
 const LiveBadge = styled.div`
   border-radius: 999px;
   border: 1px solid rgb(82 221 160 / 0.22);
@@ -59,26 +55,25 @@ const LiveBadge = styled.div`
 
 const ContentGrid = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
   gap: 18px;
-  margin-top: 26px;
-
-  @media (max-width: 980px) {
-    grid-template-columns: 1fr;
-  }
+  margin-top: 14px;
 `;
 
 const Player = styled.div`
   position: relative;
   overflow: hidden;
-  min-height: 520px;
+  min-height: clamp(560px, 74vh, 920px);
   border-radius: 28px;
   border: 1px solid rgb(255 255 255 / 0.08);
   background:
     radial-gradient(circle at top, rgb(114 19 46 / 0.24), transparent 34%),
     linear-gradient(180deg, #241724 0%, #15161d 42%, #090b0f 100%);
 
-  @media (max-width: 980px) {
+  @media (max-width: 1100px) {
+    min-height: 64vh;
+  }
+
+  @media (max-width: 760px) {
     min-height: 420px;
   }
 `;
@@ -89,21 +84,6 @@ const Scanlines = styled.div`
   background: linear-gradient(transparent 0%, rgb(255 255 255 / 0.03) 50%, transparent 100%);
   background-size: 100% 10px;
   opacity: 0.35;
-`;
-
-const PlayerTop = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-between;
-  padding: 18px 20px;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: rgb(255 255 255 / 0.72);
 `;
 
 const Crosshair = styled.div`
@@ -185,18 +165,14 @@ const DeckTitle = styled.p`
   letter-spacing: -0.04em;
 `;
 
-const CameraBadge = styled.div`
-  border-radius: 999px;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  background: rgb(0 0 0 / 0.3);
-  padding: 12px 18px;
-  font-size: 13px;
-  color: rgb(255 255 255 / 0.76);
-`;
-
 const SideStack = styled.div`
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const SideCard = styled.div`
@@ -231,72 +207,46 @@ const SideCardBody = styled.p`
   color: rgb(255 255 255 / 0.68);
 `;
 
-const ControlRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-`;
-
-const Control = styled.span`
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.1);
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 700;
-`;
-
 export function MockStreamPanel() {
   return (
     <Panel data-testid="watch-stream-panel" aria-label="Live stream panel">
       <TopRow>
         <div>
-          <Kicker>Mock stream</Kicker>
-          <Title>Field Stream A</Title>
-          <Body>
-            Placeholder broadcast module with stronger production framing, telemetry, and a more convincing control-room presence.
-          </Body>
+          <Kicker>Now watching</Kicker>
+          <Title>67 - MICMP - Hemlock Division - QM 1</Title>
         </div>
-        <LiveBadge>Live demo</LiveBadge>
+        <LiveBadge>Live look</LiveBadge>
       </TopRow>
 
       <ContentGrid>
         <Player>
           <Scanlines />
-          <PlayerTop>
-            <span>Einstein warmup</span>
-            <span>16:9 placeholder</span>
-          </PlayerTop>
           <Crosshair>
             <PlayButton />
           </Crosshair>
           <BottomBar>
             <div>
               <DeckLabel>On deck</DeckLabel>
-              <DeckTitle>Qualification Cycle</DeckTitle>
+              <DeckTitle>1114</DeckTitle>
             </div>
-            <CameraBadge>Camera preset: Wide field</CameraBadge>
           </BottomBar>
         </Player>
 
         <SideStack>
           <SideCard>
-            <SideCardLabel>Broadcast mode</SideCardLabel>
-            <SideCardValue>Observer layout</SideCardValue>
-            <SideCardBody>Priority overlays tuned for quick scanning.</SideCardBody>
+            <SideCardLabel>Coming up in 7 minutes</SideCardLabel>
+            <SideCardValue>1114</SideCardValue>
+            <SideCardBody>ONTCMP - Technology Division - QM10</SideCardBody>
           </SideCard>
           <SideCard>
-            <SideCardLabel>Latency target</SideCardLabel>
-            <SideCardValue>Sub 100 ms refresh</SideCardValue>
-            <SideCardBody>Derived entirely from local mock timing windows.</SideCardBody>
+            <SideCardLabel>Coming up in 14 minutes</SideCardLabel>
+            <SideCardValue>3538</SideCardValue>
+            <SideCardBody>MICMP - DTE Division - QM2</SideCardBody>
           </SideCard>
           <SideCard>
-            <SideCardLabel>Controls</SideCardLabel>
-            <ControlRow>
-              <Control>Replay</Control>
-              <Control>Audio</Control>
-              <Control>Clips</Control>
-            </ControlRow>
+            <SideCardLabel>Coming up in 21 minutes</SideCardLabel>
+            <SideCardValue>33</SideCardValue>
+            <SideCardBody>MICMP - Consumers Energy Division - QM7</SideCardBody>
           </SideCard>
         </SideStack>
       </ContentGrid>

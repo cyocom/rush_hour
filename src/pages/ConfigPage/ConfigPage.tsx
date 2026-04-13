@@ -37,15 +37,6 @@ const Panel = styled.section`
   box-shadow: 0 28px 70px rgb(0 0 0 / 0.14);
 `;
 
-const DarkPanel = styled.section`
-  border-radius: 30px;
-  border: 1px solid rgb(255 255 255 / 0.08);
-  background: linear-gradient(180deg, rgb(20 22 28 / 0.96), rgb(14 16 22 / 0.94));
-  color: white;
-  padding: 24px;
-  box-shadow: 0 28px 70px rgb(0 0 0 / 0.18);
-`;
-
 const HeadingRow = styled.div`
   display: flex;
   align-items: end;
@@ -67,10 +58,6 @@ const Kicker = styled.p`
   color: rgb(150 29 55);
 `;
 
-const DarkKicker = styled(Kicker)`
-  color: rgb(255 220 228 / 0.76);
-`;
-
 const Title = styled.h2`
   margin: 12px 0 0;
   font-size: 34px;
@@ -80,20 +67,12 @@ const Title = styled.h2`
   color: #0a0a0a;
 `;
 
-const DarkTitle = styled(Title)`
-  color: white;
-`;
-
 const Body = styled.p`
   margin: 16px 0 0;
   max-width: 52ch;
   font-size: 17px;
   line-height: 1.7;
   color: rgb(79 75 69);
-`;
-
-const DarkBody = styled(Body)`
-  color: rgb(255 255 255 / 0.72);
 `;
 
 const CountBadge = styled.div`
@@ -125,29 +104,6 @@ const Bullet = styled.li`
   color: rgb(79 75 69);
 `;
 
-const DarkMetric = styled.div`
-  border-radius: 22px;
-  border: 1px solid rgb(255 255 255 / 0.08);
-  background: rgb(255 255 255 / 0.05);
-  padding: 16px;
-`;
-
-const MetricLabel = styled.p`
-  margin: 0;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgb(255 255 255 / 0.56);
-`;
-
-const MetricText = styled.p`
-  margin: 10px 0 0;
-  font-size: 16px;
-  line-height: 1.6;
-  color: rgb(255 255 255 / 0.78);
-`;
-
 export function ConfigPage() {
   const { trackedTeams, addTeam, removeTeam, reorderTeam } = useWatchPreferences()
   const [error, setError] = useState<string | null>(null)
@@ -174,7 +130,6 @@ export function ConfigPage() {
     <PageShell
       title="Config"
       subtitle="Manage your tracked teams and keep priorities in watch-ready order."
-      eyebrow="Rushhour Control Room"
     >
       <Main>
         <LeftColumn>
@@ -184,7 +139,7 @@ export function ConfigPage() {
                 <Kicker>Priority editor</Kicker>
                 <Title>Build your team stack</Title>
                 <Body>
-                  Add teams, reorder them for watch priority, and keep the session lightweight. The top of the stack drives the most important alerts first.
+                  Add teams, put them in the order you care about most, and keep your favorites at the top so the watch page feels personal.
                 </Body>
               </div>
               <CountBadge>{trackedTeams.length} tracked</CountBadge>
@@ -202,33 +157,15 @@ export function ConfigPage() {
         ) : (
           <Panel>
             <Title style={{ marginTop: 0, fontSize: '2.25rem' }}>Priority order</Title>
-            <Body style={{ marginTop: '10px' }}>Drag or use keyboard controls to reorder teams.</Body>
+            <Body style={{ marginTop: '10px' }}>Drag teams into place or use the buttons to move them up and down.</Body>
             <PriorityTeamList teams={trackedTeams} onRemove={removeTeam} onReorder={reorderTeam} />
           </Panel>
         )}
         </LeftColumn>
 
         <RightColumn>
-          <DarkPanel>
-            <DarkKicker>Modern navigation</DarkKicker>
-            <DarkTitle>Desk-ready workflow</DarkTitle>
-            <DarkBody>
-              Configure here, then move straight into Watch with a cleaner route hierarchy and stronger visual separation between setup and live monitoring.
-            </DarkBody>
-            <div style={{ display: 'grid', gap: '12px', marginTop: '20px' }}>
-              <DarkMetric>
-                <MetricLabel>Persistence</MetricLabel>
-                <MetricText>Session storage keeps ranking stable across reloads.</MetricText>
-              </DarkMetric>
-              <DarkMetric>
-                <MetricLabel>Control scheme</MetricLabel>
-                <MetricText>Drag-and-drop plus button-based keyboard fallback.</MetricText>
-              </DarkMetric>
-            </div>
-          </DarkPanel>
-
           <Panel>
-            <Kicker>Order strategy</Kicker>
+            <Kicker>Helpful tip</Kicker>
             <Title>What rises to the top</Title>
             <BulletList>
               <Bullet>Put your must-watch alliance captains first.</Bullet>

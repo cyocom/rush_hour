@@ -13,23 +13,33 @@ import { useWatchPreferences } from '../../app/watchPreferencesContext'
 const Main = styled.main`
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.82fr);
   margin-top: 24px;
-
-  @media (max-width: 1180px) {
-    grid-template-columns: 1fr;
-  }
 `;
 
-const LeftColumn = styled.div`
+const LowerGrid = styled.section`
   display: grid;
   gap: 24px;
+  grid-template-columns: minmax(640px, 1.15fr) minmax(460px, 0.85fr);
+  align-items: start;
+  overflow-x: auto;
+  padding-bottom: 6px;
 `;
 
-const RightColumn = styled.div`
+const PrimaryColumn = styled.div`
   display: grid;
+  gap: 24px;
+  min-width: 640px;
+`;
+
+const SupportColumn = styled.div`
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(360px, 1fr);
   gap: 24px;
   align-content: start;
+  min-width: 460px;
+  overflow-x: auto;
+  padding-bottom: 6px;
 `;
 
 const LightPanel = styled.section`
@@ -148,64 +158,40 @@ export function WatchPage() {
     <PageShell
       title="Watch"
       subtitle="Track upcoming matches for your selected teams and catch overlap conflicts early."
-      eyebrow="Rushhour Match Desk"
+      immersive
     >
       <Main>
-        <LeftColumn>
-          <MockStreamPanel />
+        <PrimaryColumn>
+            {alerts.length > 0 ? <UpcomingAlertsList alerts={alerts} /> : null}
+            {conflicts.length > 0 ? <ConflictList conflicts={conflicts} /> : null}
+            {trackedTeams.length === 0 ? (
+              <StatusCard
+                title="No teams configured"
+                body="Add your first team in Config to start getting upcoming watch alerts."
+                action={<ActionLink to="/config">Go to Config</ActionLink>}
+              />
+            ) : null}
 
-          <LightPanel>
-            <Kicker>Overview</Kicker>
-            <SectionTitle>Priority snapshot</SectionTitle>
-            <MetricGrid>
-              <MetricCard>
-                <MetricLabel>Tracked teams</MetricLabel>
-                <MetricValue>{trackedTeams.length}</MetricValue>
-              </MetricCard>
-              <MetricCard>
-                <MetricLabel>Upcoming alerts</MetricLabel>
-                <MetricValue>{alerts.length}</MetricValue>
-              </MetricCard>
-              <MetricCard>
-                <MetricLabel>Conflicts</MetricLabel>
-                <MetricValue>{conflicts.length}</MetricValue>
-              </MetricCard>
-              <MetricCard>
-                <MetricLabel>Mode</MetricLabel>
-                <MetricValue>Mock</MetricValue>
-              </MetricCard>
-            </MetricGrid>
-          </LightPanel>
+            {trackedTeams.length > 0 && alerts.length === 0 ? (
+              <StatusCard
+                title="No upcoming tracked matches"
+                body="Your teams are selected, but none of them show up in the upcoming schedule right now."
+              />
+            ) : null}
+        </PrimaryColumn>
 
-          {alerts.length > 0 ? <UpcomingAlertsList alerts={alerts} /> : null}
-        </LeftColumn>
+        <MockStreamPanel />
 
-        <RightColumn>
-          <DarkPanel>
-            <KickerLight>Operator note</KickerLight>
-            <SectionTitleLight>Watchline guidance</SectionTitleLight>
-            <SectionBodyLight>
-              Use this view like a production desk: stream on the left, priority state on the right, and conflict calls surfaced before matches overlap.
-            </SectionBodyLight>
-          </DarkPanel>
+        <LowerGrid>
 
-        {trackedTeams.length === 0 ? (
-          <StatusCard
-            title="No teams configured"
-            body="Add your first team in Config to start getting upcoming watch alerts."
-            action={<ActionLink to="/config">Go to Config</ActionLink>}
-          />
-        ) : null}
-
-        {trackedTeams.length > 0 && alerts.length === 0 ? (
-          <StatusCard
-            title="No upcoming tracked matches"
-            body="Your tracked teams are set, but none of them appear in the upcoming mock schedule right now."
-          />
-        ) : null}
-
-        {conflicts.length > 0 ? <ConflictList conflicts={conflicts} /> : null}
-        </RightColumn>
+            <DarkPanel>
+              <KickerLight>Good to know</KickerLight>
+              <SectionTitleLight>How to use this page</SectionTitleLight>
+              <SectionBodyLight>
+                Keep the stream front and center, then use the match cards and warnings below when you want a quick read on what is coming up.
+              </SectionBodyLight>
+            </DarkPanel>
+        </LowerGrid>
       </Main>
     </PageShell>
   )

@@ -5,7 +5,7 @@ import styled from 'styled-components'
 interface PageShellProps {
   title: string
   subtitle: string
-  eyebrow?: string
+  immersive?: boolean
   children: ReactNode
 }
 
@@ -40,6 +40,19 @@ const Frame = styled.div`
   @media (max-width: 900px) {
     width: min(100vw - 20px, 100%);
     padding-top: 16px;
+  }
+`;
+
+const ImmersiveFrame = styled.div`
+  position: relative;
+  z-index: 1;
+  width: min(1640px, calc(100vw - 20px));
+  margin: 0 auto;
+  padding: 10px 0 20px;
+
+  @media (max-width: 900px) {
+    width: min(100vw - 10px, 100%);
+    padding-top: 8px;
   }
 `;
 
@@ -137,6 +150,78 @@ const Main = styled.div`
   min-width: 0;
 `;
 
+const ImmersiveTopBar = styled.header`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: linear-gradient(180deg, rgb(19 21 27 / 0.96), rgb(14 16 21 / 0.94));
+  color: white;
+  border-radius: 20px;
+  padding: 12px 16px;
+  box-shadow: 0 20px 50px rgb(0 0 0 / 0.22);
+
+  @media (max-width: 760px) {
+    flex-direction: column;
+    align-items: start;
+  }
+`;
+
+const ImmersiveBrand = styled.div`
+  display: grid;
+  gap: 4px;
+`;
+
+const ImmersiveKicker = styled.p`
+  margin: 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgb(255 221 228 / 0.7);
+`;
+
+const ImmersiveTitle = styled.p`
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+`;
+
+const ImmersiveNav = styled.nav`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+`;
+
+const CompactNavLink = styled(NavLink)`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.78);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(255 255 255 / 0.03);
+  transition: 180ms ease;
+
+  &:hover {
+    color: white;
+    background: rgb(255 255 255 / 0.07);
+  }
+
+  &.active {
+    background: linear-gradient(135deg, rgb(150 29 55), rgb(184 48 82));
+    color: white;
+    border-color: rgb(255 255 255 / 0.12);
+  }
+`;
+
 const Hero = styled.header`
   border: 1px solid rgb(255 255 255 / 0.08);
   background:
@@ -167,15 +252,6 @@ const HeroEyebrow = styled.p`
   color: rgb(150 29 55);
 `;
 
-const HeroContext = styled.p`
-  margin: 10px 0 0;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgb(87 81 74);
-`;
-
 const HeroTitle = styled.h1`
   margin: 14px 0 0;
   font-size: clamp(3rem, 5vw, 5.25rem);
@@ -191,68 +267,6 @@ const HeroSubtitle = styled.p`
   font-size: 18px;
   line-height: 1.65;
   color: rgb(79 75 69);
-`;
-
-const ChipRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 24px;
-`;
-
-const Chip = styled.span`
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  border: 1px solid rgb(183 172 158);
-  background: rgb(255 255 255 / 0.68);
-  padding: 10px 16px;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgb(90 82 74);
-`;
-
-const HeroStatRow = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  min-width: 280px;
-
-  @media (max-width: 900px) {
-    width: 100%;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const HeroStat = styled.div`
-  border-radius: 22px;
-  background: rgb(255 255 255 / 0.7);
-  border: 1px solid rgb(202 192 180);
-  padding: 16px;
-`;
-
-const HeroStatLabel = styled.p`
-  margin: 0;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgb(110 102 93);
-`;
-
-const HeroStatValue = styled.p`
-  margin: 10px 0 0;
-  font-size: 28px;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: -0.06em;
-  color: #0a0a0a;
 `;
 
 const StyledNavLink = styled(NavLink)`
@@ -303,7 +317,28 @@ const NavBadge = styled.span`
   text-transform: uppercase;
 `;
 
-export function PageShell({ title, subtitle, eyebrow = 'Rushhour Watchdesk', children }: PageShellProps) {
+export function PageShell({ title, subtitle, immersive = false, children }: PageShellProps) {
+  if (immersive) {
+    return (
+      <Shell>
+        <Backdrop />
+        <ImmersiveFrame>
+          <ImmersiveTopBar>
+            <ImmersiveBrand>
+              <ImmersiveKicker>Rushhour Watchdesk</ImmersiveKicker>
+              <ImmersiveTitle>{title}</ImmersiveTitle>
+            </ImmersiveBrand>
+            <ImmersiveNav aria-label="Primary">
+              <CompactNavLink to="/watch">Watch</CompactNavLink>
+              <CompactNavLink to="/config">Config</CompactNavLink>
+            </ImmersiveNav>
+          </ImmersiveTopBar>
+          {children}
+        </ImmersiveFrame>
+      </Shell>
+    )
+  }
+
   return (
     <Shell>
       <Backdrop />
@@ -311,10 +346,10 @@ export function PageShell({ title, subtitle, eyebrow = 'Rushhour Watchdesk', chi
         <AppGrid>
           <Sidebar>
             <Brand>
-              <BrandKicker>FRC operator panel</BrandKicker>
-              <BrandTitle>FRC watch control</BrandTitle>
+              <BrandKicker>Game day guide</BrandKicker>
+              <BrandTitle>FRC match watch</BrandTitle>
               <BrandBody>
-                Prioritize teams, watch upcoming match windows, and surface conflicts before the stream gets busy.
+                Follow your favorite teams, keep an eye on the next matches, and spot schedule overlaps before they sneak up on you.
               </BrandBody>
             </Brand>
 
@@ -322,14 +357,14 @@ export function PageShell({ title, subtitle, eyebrow = 'Rushhour Watchdesk', chi
               <StyledNavLink to="/watch">
                 <NavLabelGroup>
                   <NavTitle>Watch</NavTitle>
-                  <NavDescription>Live monitoring desk</NavDescription>
+                  <NavDescription>See what is coming up next</NavDescription>
                 </NavLabelGroup>
                 <NavBadge>01</NavBadge>
               </StyledNavLink>
               <StyledNavLink to="/config">
                 <NavLabelGroup>
                   <NavTitle>Config</NavTitle>
-                  <NavDescription>Priority queue editor</NavDescription>
+                  <NavDescription>Choose the teams you care about</NavDescription>
                 </NavLabelGroup>
                 <NavBadge>02</NavBadge>
               </StyledNavLink>
@@ -337,12 +372,12 @@ export function PageShell({ title, subtitle, eyebrow = 'Rushhour Watchdesk', chi
 
             <NavMeta>
               <MetaCard>
-                <MetaLabel>Input source</MetaLabel>
-                <MetaValue>Mock schedule only</MetaValue>
+                <MetaLabel>Schedule</MetaLabel>
+                <MetaValue>Upcoming matches at a glance</MetaValue>
               </MetaCard>
               <MetaCard>
-                <MetaLabel>Memory model</MetaLabel>
-                <MetaValue>Browser session scoped</MetaValue>
+                <MetaLabel>Your picks</MetaLabel>
+                <MetaValue>Kept with you while you browse</MetaValue>
               </MetaCard>
             </NavMeta>
           </Sidebar>
@@ -352,29 +387,9 @@ export function PageShell({ title, subtitle, eyebrow = 'Rushhour Watchdesk', chi
               <HeroTop>
                 <div>
                   <HeroEyebrow>Rushhour Watchdesk</HeroEyebrow>
-                  <HeroContext>{eyebrow}</HeroContext>
                   <HeroTitle>{title}</HeroTitle>
                   <HeroSubtitle>{subtitle}</HeroSubtitle>
-                  <ChipRow>
-                    <Chip>Mock broadcast</Chip>
-                    <Chip>Session memory</Chip>
-                    <Chip>Responsive layout</Chip>
-                  </ChipRow>
                 </div>
-                <HeroStatRow>
-                  <HeroStat>
-                    <HeroStatLabel>Mode</HeroStatLabel>
-                    <HeroStatValue>Live</HeroStatValue>
-                  </HeroStat>
-                  <HeroStat>
-                    <HeroStatLabel>Theme</HeroStatLabel>
-                    <HeroStatValue>Desk</HeroStatValue>
-                  </HeroStat>
-                  <HeroStat>
-                    <HeroStatLabel>State</HeroStatLabel>
-                    <HeroStatValue>Ready</HeroStatValue>
-                  </HeroStat>
-                </HeroStatRow>
               </HeroTop>
             </Hero>
             {children}
