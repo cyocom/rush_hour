@@ -3,18 +3,25 @@ import { ConfigPage } from '../pages/ConfigPage/ConfigPage'
 import { WatchPage } from '../pages/WatchPage/WatchPage'
 
 export function createAppRouter() {
-  return createBrowserRouter([
+  const baseName = import.meta.env.BASE_URL.replace(/\/$/, '') || '/'
+
+  return createBrowserRouter(
+    [
+      {
+        path: '/',
+        element: <Navigate to="/watch" replace />,
+      },
+      {
+        path: '/watch',
+        element: <WatchPage />,
+      },
+      {
+        path: '/config',
+        element: <ConfigPage />,
+      },
+    ],
     {
-      path: '/',
-      element: <Navigate to="/watch" replace />,
+      basename: baseName,
     },
-    {
-      path: '/watch',
-      element: <WatchPage />,
-    },
-    {
-      path: '/config',
-      element: <ConfigPage />,
-    },
-  ])
+  )
 }
