@@ -7,17 +7,17 @@ Static React application for a FIRST Robotics watch experience with two flows:
 ## Local development
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ## Test and quality commands
 
 ```bash
-npm run lint
-npm run test
-npm run build
-npm run test:e2e
+pnpm lint
+pnpm test
+pnpm build
+pnpm test:e2e
 ```
 
 ## Implementation notes

@@ -31,25 +31,6 @@ const PrimaryColumn = styled.div`
   min-width: 640px;
 `;
 
-const SupportColumn = styled.div`
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(360px, 1fr);
-  gap: 24px;
-  align-content: start;
-  min-width: 460px;
-  overflow-x: auto;
-  padding-bottom: 6px;
-`;
-
-const LightPanel = styled.section`
-  border-radius: 30px;
-  border: 1px solid rgb(255 255 255 / 0.08);
-  background: linear-gradient(180deg, rgb(247 240 232 / 0.96), rgb(238 231 220 / 0.92));
-  padding: 24px;
-  box-shadow: 0 28px 70px rgb(0 0 0 / 0.14);
-`;
-
 const DarkPanel = styled.section`
   border-radius: 30px;
   border: 1px solid rgb(255 255 255 / 0.08);
@@ -94,46 +75,6 @@ const SectionBody = styled.p`
 
 const SectionBodyLight = styled(SectionBody)`
   color: rgb(255 255 255 / 0.72);
-`;
-
-const MetricGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 24px;
-
-  @media (max-width: 900px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  @media (max-width: 520px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const MetricCard = styled.div`
-  border-radius: 24px;
-  background: rgb(255 255 255 / 0.84);
-  border: 1px solid rgb(207 197 186);
-  padding: 18px;
-`;
-
-const MetricLabel = styled.p`
-  margin: 0;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgb(110 102 93);
-`;
-
-const MetricValue = styled.p`
-  margin: 12px 0 0;
-  font-size: 38px;
-  line-height: 1;
-  letter-spacing: -0.08em;
-  font-weight: 900;
-  color: #0a0a0a;
 `;
 
 const ActionLink = styled(Link)`
