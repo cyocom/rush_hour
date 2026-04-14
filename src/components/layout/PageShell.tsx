@@ -117,35 +117,6 @@ const SideNav = styled.nav`
   margin-top: 24px;
 `;
 
-const NavMeta = styled.div`
-  display: grid;
-  gap: 12px;
-  margin-top: 24px;
-`;
-
-const MetaCard = styled.div`
-  border: 1px solid rgb(255 255 255 / 0.08);
-  background: rgb(255 255 255 / 0.04);
-  border-radius: 22px;
-  padding: 16px;
-`;
-
-const MetaLabel = styled.p`
-  margin: 0;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgb(255 255 255 / 0.5);
-`;
-
-const MetaValue = styled.p`
-  margin: 8px 0 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: white;
-`;
-
 const Main = styled.div`
   min-width: 0;
 `;
@@ -331,6 +302,7 @@ export function PageShell({ title, subtitle, immersive = false, children }: Page
             <ImmersiveNav aria-label="Primary">
               <CompactNavLink to="/watch">Watch</CompactNavLink>
               <CompactNavLink to="/config">Config</CompactNavLink>
+              <CompactNavLink to="/schedule">Schedule</CompactNavLink>
             </ImmersiveNav>
           </ImmersiveTopBar>
           {children}
@@ -368,18 +340,14 @@ export function PageShell({ title, subtitle, immersive = false, children }: Page
                 </NavLabelGroup>
                 <NavBadge>02</NavBadge>
               </StyledNavLink>
+              <StyledNavLink to="/schedule">
+                <NavLabelGroup>
+                  <NavTitle>Schedule</NavTitle>
+                  <NavDescription>Upcoming matches at a glance</NavDescription>
+                </NavLabelGroup>
+                <NavBadge>03</NavBadge>
+              </StyledNavLink>
             </SideNav>
-
-            <NavMeta>
-              <MetaCard>
-                <MetaLabel>Schedule</MetaLabel>
-                <MetaValue>Upcoming matches at a glance</MetaValue>
-              </MetaCard>
-              <MetaCard>
-                <MetaLabel>Your picks</MetaLabel>
-                <MetaValue>Kept with you while you browse</MetaValue>
-              </MetaCard>
-            </NavMeta>
           </Sidebar>
 
           <Main>
