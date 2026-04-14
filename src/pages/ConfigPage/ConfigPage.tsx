@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 import { PageShell } from '../../components/layout/PageShell'
 import { StatusCard } from '../../components/status/StatusCard'
@@ -6,6 +6,7 @@ import { PriorityTeamList } from '../../components/teams/PriorityTeamList'
 import { TeamInputForm } from '../../components/teams/TeamInputForm'
 import { useWatchPreferences } from '../../app/watchPreferencesContext'
 import { normalizeTeamId, validateTeamInput } from '../../domain/validation/teams'
+import { readPersistentPreferences, writePersistentPreferences } from '../../domain/services/persistentPreferences'
 
 const Main = styled.main`
   display: grid;
@@ -87,6 +88,116 @@ const CountBadge = styled.div`
   color: rgb(87 81 74);
 `;
 
+const SectionTitle = styled.h3`
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: #0a0a0a;
+`;
+
+const FieldRow = styled.div`
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+`;
+
+const FieldInput = styled.input`
+  flex: 1;
+  border-radius: 14px;
+  border: 1px solid rgb(202 192 180);
+  background: rgb(255 255 255 / 0.9);
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0a0a0a;
+  outline: none;
+
+  &:focus {
+    border-color: rgb(150 29 55);
+    box-shadow: 0 0 0 3px rgb(150 29 55 / 0.12);
+  }
+
+  &[type='password'] {
+    letter-spacing: 0.1em;
+  }
+`;
+
+const ActionButton = styled.button`
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, rgb(150 29 55), rgb(184 48 82));
+  color: white;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: 140ms ease;
+
+  &:hover {
+    opacity: 0.88;
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+`;
+
+const SecondaryButton = styled.button`
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: 1px solid rgb(202 192 180);
+  background: rgb(255 255 255 / 0.85);
+  color: rgb(79 75 69);
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: 140ms ease;
+
+  &:hover {
+    background: rgb(255 255 255 / 0.95);
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+`;
+
+const SimRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+`;
+
+const SimToggleLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0a0a0a;
+  cursor: pointer;
+`;
+
+const SimToggle = styled.input`
+  width: 18px;
+  height: 18px;
+  accent-color: rgb(150 29 55);
+  cursor: pointer;
+`;
+
+const StatusIndicator = styled.p<{ $active: boolean }>`
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: ${({ $active }) => ($active ? 'rgb(150 29 55)' : 'rgb(130 120 108)')};
+`;
+
 const BulletList = styled.ul`
   margin: 20px 0 0;
   padding: 0;
@@ -108,6 +219,36 @@ export function ConfigPage() {
   const { trackedTeams, addTeam, removeTeam, reorderTeam } = useWatchPreferences()
   const [error, setError] = useState<string | null>(null)
 
+  // ── Simulation clock state (US2) ──────────────────────────────────────────
+  const [simEnabled, setSimEnabled] = useState(false)
+  const [simDatetime, setSimDatetime] = useState('')
+  const [simRunning, setSimRunning] = useState(false)
+  const [simStartedAtISOString, setSimStartedAtISOString] = useState<string | null>(null)
+  const [simTickMs, setSimTickMs] = useState(Date.now())
+
+  // ── TBA API key state (US3) ───────────────────────────────────────────────
+  const [tbaKeyInput, setTbaKeyInput] = useState('')
+  const [tbaKeyConfigured, setTbaKeyConfigured] = useState(false)
+
+  // Load persisted preferences on mount
+  useEffect(() => {
+    const prefs = readPersistentPreferences()
+    setSimEnabled(prefs.simulationClock.enabled)
+    setSimDatetime(prefs.simulationClock.simulatedISOString ?? '')
+    setSimRunning(prefs.simulationClock.running)
+    setSimStartedAtISOString(prefs.simulationClock.startedAtISOString)
+    setTbaKeyInput(prefs.tbaApiKey ? `${prefs.tbaApiKey.slice(0, 6)}…` : '')
+    setTbaKeyConfigured(!!prefs.tbaApiKey)
+  }, [])
+
+  useEffect(() => {
+    if (!simRunning) return
+    const id = window.setInterval(() => {
+      setSimTickMs(Date.now())
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [simRunning])
+
   const emptyHint = useMemo(
     () => trackedTeams.length === 0,
     [trackedTeams.length],
@@ -124,6 +265,108 @@ export function ConfigPage() {
 
     addTeam(normalized)
     setError(null)
+  }
+
+  // ── Simulation clock handlers ─────────────────────────────────────────────
+  function toLocalDatetimeInputValue(value: Date): string {
+    const pad = (n: number) => `${n}`.padStart(2, '0')
+    const yyyy = value.getFullYear()
+    const mm = pad(value.getMonth() + 1)
+    const dd = pad(value.getDate())
+    const hh = pad(value.getHours())
+    const min = pad(value.getMinutes())
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`
+  }
+
+  function getCurrentSimulatedTime(): Date | null {
+    if (!simDatetime) return null
+    const base = new Date(simDatetime)
+    if (isNaN(base.getTime())) return null
+
+    if (!simRunning || !simStartedAtISOString) {
+      return base
+    }
+
+    const started = new Date(simStartedAtISOString)
+    if (isNaN(started.getTime())) {
+      return base
+    }
+
+    const elapsed = simTickMs - started.getTime()
+    return new Date(base.getTime() + Math.max(0, elapsed))
+  }
+
+  function handleSimSave() {
+    if (simEnabled && !simDatetime) return
+    writePersistentPreferences({
+      simulationClock: {
+        enabled: simEnabled,
+        simulatedISOString: simEnabled ? simDatetime : null,
+        running: false,
+        startedAtISOString: null,
+      },
+    })
+    setSimRunning(false)
+    setSimStartedAtISOString(null)
+  }
+
+  function handleSimToggle(checked: boolean) {
+    setSimEnabled(checked)
+    if (!checked) {
+      writePersistentPreferences({
+        simulationClock: {
+          enabled: false,
+          simulatedISOString: null,
+          running: false,
+          startedAtISOString: null,
+        },
+      })
+      setSimRunning(false)
+      setSimStartedAtISOString(null)
+    }
+  }
+
+  function handleSimStart() {
+    if (!simEnabled || !simDatetime) return
+    const nowIso = new Date().toISOString()
+    writePersistentPreferences({
+      simulationClock: {
+        enabled: true,
+        simulatedISOString: simDatetime,
+        running: true,
+        startedAtISOString: nowIso,
+      },
+    })
+    setSimRunning(true)
+    setSimStartedAtISOString(nowIso)
+    setSimTickMs(Date.now())
+  }
+
+  function handleSimStop() {
+    const current = getCurrentSimulatedTime()
+    const frozen = current ? toLocalDatetimeInputValue(current) : simDatetime
+    writePersistentPreferences({
+      simulationClock: {
+        enabled: simEnabled,
+        simulatedISOString: frozen || null,
+        running: false,
+        startedAtISOString: null,
+      },
+    })
+    setSimRunning(false)
+    setSimStartedAtISOString(null)
+    if (frozen) setSimDatetime(frozen)
+  }
+
+  // ── TBA API key handler ───────────────────────────────────────────────────
+  function handleTbaKeySave() {
+    // If input looks like a masked display value (ends with …), don't overwrite
+    if (tbaKeyInput.endsWith('…')) return
+    writePersistentPreferences({ tbaApiKey: tbaKeyInput.trim() })
+    setTbaKeyConfigured(!!tbaKeyInput.trim())
+    if (tbaKeyInput.trim()) {
+      setTbaKeyInput(`${tbaKeyInput.trim().slice(0, 6)}…`)
+    }
   }
 
   return (
@@ -161,6 +404,67 @@ export function ConfigPage() {
             <PriorityTeamList teams={trackedTeams} onRemove={removeTeam} onReorder={reorderTeam} />
           </Panel>
         )}
+
+          {/* ── Simulation Clock (US2) ───────────────────────── */}
+          <Panel>
+            <SectionTitle>Simulation clock</SectionTitle>
+            <Body style={{ margin: '0 0 16px' }}>
+              Override the effective business time so you can test schedule logic on any date without waiting for a live event.
+            </Body>
+            <SimRow>
+              <SimToggleLabel>
+                <SimToggle
+                  type="checkbox"
+                  checked={simEnabled}
+                  onChange={(e) => handleSimToggle(e.target.checked)}
+                  data-testid="config-sim-clock-toggle"
+                />
+                Enable simulation mode
+              </SimToggleLabel>
+            </SimRow>
+            {simEnabled && (
+              <FieldRow style={{ marginBottom: '12px' }}>
+                <FieldInput
+                  type="datetime-local"
+                  value={simDatetime}
+                  onChange={(e) => setSimDatetime(e.target.value)}
+                  data-testid="config-sim-clock-datetime-input"
+                />
+                <ActionButton
+                  onClick={handleSimSave}
+                  data-testid="config-sim-clock-save-btn"
+                >
+                  Save
+                </ActionButton>
+                {simRunning ? (
+                  <SecondaryButton
+                    onClick={handleSimStop}
+                    data-testid="config-sim-clock-stop-btn"
+                  >
+                    Stop
+                  </SecondaryButton>
+                ) : (
+                  <SecondaryButton
+                    onClick={handleSimStart}
+                    data-testid="config-sim-clock-start-btn"
+                    disabled={!simEnabled || !simDatetime}
+                  >
+                    Start
+                  </SecondaryButton>
+                )}
+              </FieldRow>
+            )}
+            <StatusIndicator
+              $active={simEnabled}
+              data-testid="config-sim-clock-active-indicator"
+            >
+              {simEnabled && simDatetime
+                ? `Simulating${simRunning ? ' (running)' : ' (paused)'}: ${
+                  (getCurrentSimulatedTime() ?? new Date(simDatetime)).toLocaleString()
+                }`
+                : 'Using real time'}
+            </StatusIndicator>
+          </Panel>
         </LeftColumn>
 
         <RightColumn>
@@ -168,10 +472,51 @@ export function ConfigPage() {
             <Kicker>Helpful tip</Kicker>
             <Title>What rises to the top</Title>
             <BulletList>
-              <Bullet>Put your must-watch alliance captains first.</Bullet>
+              <Bullet>Put your must-watch teams first.</Bullet>
               <Bullet>Keep likely overlap teams near the top for early conflict visibility.</Bullet>
-              <Bullet>Trim inactive teams to reduce noise on the Watch route.</Bullet>
             </BulletList>
+          </Panel>
+
+          {/* ── TBA API Key (US3) ────────────────────────────── */}
+          <Panel>
+            <SectionTitle>TBA API key</SectionTitle>
+            <Body style={{ margin: '0 0 16px' }}>
+              Required for the schedule page. Get a free read key at{' '}
+              <a
+                href="https://www.thebluealliance.com/account"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: 'rgb(150 29 55)', fontWeight: 700 }}
+              >
+                thebluealliance.com/account
+              </a>
+              .
+            </Body>
+            <FieldRow>
+              <FieldInput
+                type="password"
+                placeholder="Paste your TBA read key"
+                value={tbaKeyInput}
+                onChange={(e) => setTbaKeyInput(e.target.value)}
+                onFocus={() => {
+                  // Clear masked display so user can type a fresh key
+                  if (tbaKeyInput.endsWith('…')) setTbaKeyInput('')
+                }}
+                data-testid="config-tba-api-key-input"
+              />
+              <ActionButton
+                onClick={handleTbaKeySave}
+                data-testid="config-tba-api-key-save-btn"
+              >
+                Save
+              </ActionButton>
+            </FieldRow>
+            <StatusIndicator
+              $active={tbaKeyConfigured}
+              data-testid="config-tba-api-key-status"
+            >
+              {tbaKeyConfigured ? 'Key configured' : 'No key set'}
+            </StatusIndicator>
           </Panel>
         </RightColumn>
       </Main>
