@@ -107,3 +107,47 @@ export interface UnifiedSchedule {
   effectiveTime: string
   isSimulated: boolean
 }
+
+// ─── Watch page types ────────────────────────────────────────────────────────
+
+export interface TBAWebcast {
+  type: string
+  channel: string
+  file?: string
+}
+
+export interface TBAEventDetail extends TBAEvent {
+  webcasts: TBAWebcast[]
+}
+
+export type WebcastPlatform = 'twitch' | 'youtube' | 'unsupported'
+
+export interface WebcastOption {
+  id: string
+  platform: WebcastPlatform
+  channel: string
+  eventKey: string
+  eventName: string
+  label: string
+  embedUrl: string | null
+  externalUrl: string
+}
+
+export type NextMatchStatus = 'upcoming' | 'soon' | 'in-progress' | 'none'
+
+export interface NextMatchInfo {
+  status: NextMatchStatus
+  entry: ScheduledMatchEntry | null
+  minutesUntil: number | null
+}
+
+export type WatchPageLoadStatus = 'idle' | 'loading' | 'done'
+
+export interface WatchPageState {
+  loadStatus: WatchPageLoadStatus
+  schedule: UnifiedSchedule | null
+  webcasts: WebcastOption[]
+  selectedWebcastId: string | null
+  noApiKey: boolean
+  noSubscribedTeams: boolean
+}

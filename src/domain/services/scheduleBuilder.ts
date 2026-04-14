@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import type { MatchConflict } from '../models/watch'
 import type { ScheduledMatchEntry, TBACompLevel, TBAEvent, TBAMatchSimple } from '../models/schedule'
 
 const COMP_LEVEL_ORDER: Record<TBACompLevel, number> = {
@@ -164,4 +165,81 @@ export function formatMatchTime(predictedTime: number | null): string | null {
   } catch {
     return null
   }
+}
+
+const CONFLICT_WINDOW_SECONDS = 5 * 60
+
+/**
+ * Returns the set of match keys that are involved in a time conflict (within
+ * CONFLICT_WINDOW_SECONDS of another match).
+ */
+export function computeConflictMatchKeys(entries: ScheduledMatchEntry[]): Set<string> {
+  const keys = new Set<string>()
+  const timed = entries
+    .filter((entry) => entry.predictedTime !== null)
+    .slice()
+    .sort((a, b) => (a.predictedTime ?? 0) - (b.predictedTime ?? 0))
+
+  for (let i = 0; i < timed.length; i += 1) {
+    const baseTime = timed[i].predictedTime!
+    for (let j = i + 1; j < timed.length; j += 1) {
+      const compareTime = timed[j].predictedTime!
+      const delta = compareTime - baseTime
+      if (delta > CONFLICT_WINDOW_SECONDS) break
+      keys.add(timed[i].matchKey)
+      keys.add(timed[j].matchKey)
+    }
+  }
+
+  return keys
+}
+
+/**
+ * Converts a set of conflicting match keys + the full entry list into
+ * MatchConflict[] for rendering in ConflictList.
+ */
+export function toMatchConflicts(
+  conflictKeys: Set<string>,
+  entries: ScheduledMatchEntry[],
+): MatchConflict[] {
+  if (conflictKeys.size === 0) return []
+
+  const conflicting = entries.filter((e) => conflictKeys.has(e.matchKey))
+
+  const timed = conflicting
+    .filter((e) => e.predictedTime !== null)
+    .slice()
+    .sort((a, b) => (a.predictedTime ?? 0) - (b.predictedTime ?? 0))
+
+  const conflicts: MatchConflict[] = []
+  const seen = new Set<string>()
+
+  for (let i = 0; i < timed.length; i += 1) {
+    for (let j = i + 1; j < timed.length; j += 1) {
+      const a = timed[i]
+      const b = timed[j]
+      const delta = (b.predictedTime ?? 0) - (a.predictedTime ?? 0)
+      if (delta > CONFLICT_WINDOW_SECONDS) break
+
+      const pairKey = [a.matchKey, b.matchKey].sort().join('|')
+      if (seen.has(pairKey)) continue
+      seen.add(pairKey)
+
+      const allTeams = Array.from(
+        new Set([...a.subscribedTeamsInMatch, ...b.subscribedTeamsInMatch]),
+      )
+      const highestPriorityTeamId = a.subscribedTeamsInMatch[0] ?? b.subscribedTeamsInMatch[0]
+
+      conflicts.push({
+        conflictId: `conflict-${a.matchKey}-${b.matchKey}`,
+        startTime: new Date((a.predictedTime ?? 0) * 1000).toISOString(),
+        endTime: new Date(((b.predictedTime ?? 0) + CONFLICT_WINDOW_SECONDS) * 1000).toISOString(),
+        impactedMatchIds: [a.matchKey, b.matchKey],
+        impactedTrackedTeams: allTeams,
+        highestPriorityTeamId,
+      })
+    }
+  }
+
+  return conflicts
 }
