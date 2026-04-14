@@ -1,4 +1,4 @@
-import type { TBAEvent, TBAMatchSimple } from '../models/schedule'
+import type { TBAEvent, TBAEventDetail, TBAMatchSimple } from '../models/schedule'
 
 const TBA_BASE_URL = 'https://www.thebluealliance.com/api/v3'
 const FALLBACK_TTL_MS = 300_000 // 5 min — used when server sends no Cache-Control
@@ -106,4 +106,8 @@ export function fetchTeamEvents(teamId: string, year: number, apiKey: string): P
 
 export function fetchEventMatches(eventKey: string, apiKey: string): Promise<TBAMatchSimple[]> {
   return fetchJson<TBAMatchSimple[]>(`/event/${eventKey}/matches/simple`, apiKey, null)
+}
+
+export function fetchEventDetail(eventKey: string, apiKey: string): Promise<TBAEventDetail> {
+  return fetchJson<TBAEventDetail>(`/event/${eventKey}`, apiKey, null)
 }

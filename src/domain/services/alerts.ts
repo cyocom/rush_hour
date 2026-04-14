@@ -1,10 +1,9 @@
 import { differenceInMinutes, isBefore } from 'date-fns'
 import type { MatchWindow, TrackedTeam, UpcomingMatchAlert, UrgencyLevel } from '../models/watch'
 
-function getUrgency(startTime: string): UrgencyLevel {
-  const now = new Date()
+function getUrgency(startTime: string, referenceDate: Date = new Date()): UrgencyLevel {
   const start = new Date(startTime)
-  const diffMinutes = differenceInMinutes(start, now)
+  const diffMinutes = differenceInMinutes(start, referenceDate)
 
   if (diffMinutes <= 0) {
     return 'now'
@@ -30,11 +29,15 @@ function resolvePriorityScore(match: MatchWindow, trackedTeams: TrackedTeam[]): 
   return Math.min(...ranks)
 }
 
-export function deriveUpcomingAlerts(matches: MatchWindow[], trackedTeams: TrackedTeam[]): UpcomingMatchAlert[] {
+export function deriveUpcomingAlerts(
+  matches: MatchWindow[],
+  trackedTeams: TrackedTeam[],
+  referenceDate: Date = new Date(),
+): UpcomingMatchAlert[] {
   const trackedSet = new Set(trackedTeams.map((team) => team.teamId.toLowerCase()))
 
   const alerts = matches
-    .filter((match) => isBefore(new Date(), new Date(match.endTime)))
+    .filter((match) => isBefore(referenceDate, new Date(match.endTime)))
     .map((match) => {
       const trackedTeamsInMatch = match.participantTeamIds.filter((teamId) => trackedSet.has(teamId.toLowerCase()))
       return {
@@ -43,7 +46,7 @@ export function deriveUpcomingAlerts(matches: MatchWindow[], trackedTeams: Track
         trackedTeamsInMatch,
         startTime: match.startTime,
         endTime: match.endTime,
-        urgency: getUrgency(match.startTime),
+        urgency: getUrgency(match.startTime, referenceDate),
         priorityScore: resolvePriorityScore(match, trackedTeams),
         label: match.label,
       }

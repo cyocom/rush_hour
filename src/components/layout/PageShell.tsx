@@ -46,7 +46,7 @@ const Frame = styled.div`
 const ImmersiveFrame = styled.div`
   position: relative;
   z-index: 1;
-  width: min(1640px, calc(100vw - 20px));
+  width: min(1840px, calc(100vw - 8px));
   margin: 0 auto;
   padding: 10px 0 20px;
 

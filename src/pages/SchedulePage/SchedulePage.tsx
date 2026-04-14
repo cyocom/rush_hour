@@ -11,32 +11,11 @@ import {
   filterUpcomingMatches,
   toScheduledMatchEntry,
   mergeAndSort,
+  computeConflictMatchKeys,
 } from '../../domain/services/scheduleBuilder'
 import type { ScheduledMatchEntry, TeamScheduleStatus, UnifiedSchedule } from '../../domain/models/schedule'
 
 const CURRENT_SEASON_YEAR = new Date().getFullYear()
-const CONFLICT_WINDOW_SECONDS = 5 * 60
-
-function computeConflictMatchKeys(entries: ScheduledMatchEntry[]): Set<string> {
-  const keys = new Set<string>()
-  const timed = entries
-    .filter((entry) => entry.predictedTime !== null)
-    .slice()
-    .sort((a, b) => (a.predictedTime ?? 0) - (b.predictedTime ?? 0))
-
-  for (let i = 0; i < timed.length; i += 1) {
-    const baseTime = timed[i].predictedTime!
-    for (let j = i + 1; j < timed.length; j += 1) {
-      const compareTime = timed[j].predictedTime!
-      const delta = compareTime - baseTime
-      if (delta > CONFLICT_WINDOW_SECONDS) break
-      keys.add(timed[i].matchKey)
-      keys.add(timed[j].matchKey)
-    }
-  }
-
-  return keys
-}
 
 // ── Styled components ────────────────────────────────────────────────────────
 

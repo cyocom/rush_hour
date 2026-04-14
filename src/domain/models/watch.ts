@@ -18,7 +18,10 @@ export interface MatchWindow {
 export interface UpcomingMatchAlert {
   alertId: string
   matchId: string
+  eventName?: string
   trackedTeamsInMatch: string[]
+  allTeamKeys?: string[]
+  subscribedTeamAlliances?: Record<string, 'red' | 'blue'>
   startTime: string
   urgency: UrgencyLevel
   priorityScore: number
