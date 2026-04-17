@@ -47,6 +47,7 @@ jobs:
       - name: Build site
         env:
           VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+          VITE_YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: pnpm build
 
       - name: Upload artifact

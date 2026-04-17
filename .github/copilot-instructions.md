@@ -9,6 +9,7 @@ Auto-generated from all feature plans. Last updated: 2026-04-17
 - `localStorage` (subscribed teams, simulation clock, TBA API key, response cache) (003-watch-page-integration)
 - TypeScript ~6.0 + React 19, React Router 7 (`createHashRouter`), Tailwind CSS, styled-components 6, date-fns 4, Vite 8 (004-shareable-config-url)
 - `localStorage` via existing `writePersistentPreferences` service — no new storage keys (004-shareable-config-url)
+- `localStorage` only for existing watch preferences; no new persistent keys required (005-new-specification)
 
 - (002-run-git-feature-hook)
 
@@ -28,9 +29,9 @@ tests/
 : Follow standard conventions
 
 ## Recent Changes
+- 005-new-specification: Added TypeScript ~6.0 + React 19, React Router 7, Tailwind CSS, styled-components 6, date-fns 4, Vite 8
 - 004-shareable-config-url: Added TypeScript ~6.0 + React 19, React Router 7 (`createHashRouter`), Tailwind CSS, styled-components 6, date-fns 4, Vite 8
 - 003-watch-page-integration: Added TypeScript ~6.0 + React 19, React Router 7, styled-components 6, Tailwind CSS, date-fns 4, Vite 8
-- 002-run-git-feature-hook: Added TypeScript ~6.0 + React 19, React Router 7, Tailwind CSS, styled-components 6, date-fns 4, Vite 8
 
 
 <!-- MANUAL ADDITIONS START -->

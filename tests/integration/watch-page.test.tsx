@@ -1,10 +1,11 @@
 import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/app/App'
 import {
   APP_PREFERENCES_SCHEMA_VERSION,
 } from '../../src/domain/models/schedule'
 import * as tbaClient from '../../src/domain/services/tbaClient'
+import { __setYouTubeAvailabilityProbeForTests } from '../../src/domain/services/streamAvailability'
 
 vi.mock('../../src/domain/services/tbaClient', () => ({
   fetchTeamEvents: vi.fn(),
@@ -37,6 +38,10 @@ describe('watch page', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+
+    __setYouTubeAvailabilityProbeForTests(async (channel) =>
+      channel === 'abc123video' ? 'offline' : 'unknown',
+    )
 
     fetchTeamEventsMock.mockResolvedValue([
       {
@@ -98,6 +103,10 @@ describe('watch page', () => {
     })
   })
 
+  afterEach(() => {
+    __setYouTubeAvailabilityProbeForTests(null)
+  })
+
   it('shows live webcast panel, alerts, and conflicts', async () => {
     window.history.pushState({}, '', '/#/watch')
     render(<App />)
@@ -105,5 +114,13 @@ describe('watch page', () => {
     expect(await screen.findByTestId('watch-stream-panel')).toBeInTheDocument()
     expect(await screen.findByTestId('watch-alert-list')).toBeInTheDocument()
     expect(await screen.findByTestId('watch-conflict-list')).toBeInTheDocument()
+  })
+
+  it('shows offline fallback messaging when no streams are online', async () => {
+    window.history.pushState({}, '', '/#/watch')
+    render(<App />)
+
+    expect(await screen.findByTestId('watch-offline-fallback-message')).toBeInTheDocument()
+    expect(await screen.findByText('Offline')).toBeInTheDocument()
   })
 })

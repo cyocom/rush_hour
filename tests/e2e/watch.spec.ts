@@ -110,6 +110,26 @@ test('watch page renders webcast, alerts, and conflicts', async ({ page }) => {
   await expect(page.getByText('How to use this page')).toHaveCount(0)
 })
 
+test('watch page keeps non-youtube options visible when youtube is offline', async ({ page }) => {
+  await seedWatchPreferences(page)
+  await mockTbaApi(page)
+
+  await page.route('https://www.youtube.com/oembed**', async (route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'not live' }),
+    })
+  })
+
+  await page.goto('/#/watch')
+
+  await expect(page.getByTestId('watch-stream-panel')).toBeVisible()
+  await expect(page.getByTestId('watch-offline-fallback-message')).toBeVisible()
+  await expect(page.getByRole('tab', { name: /Twitch/i })).toBeVisible()
+  await expect(page.getByRole('tab', { name: /YouTube/i })).toBeVisible()
+})
+
 test('watch page layout is responsive at 375 and 768', async ({ page }) => {
   await seedWatchPreferences(page)
   await mockTbaApi(page)

@@ -8,7 +8,7 @@ import { StatusCard } from '../../components/status/StatusCard'
 import { WebcastPanel } from '../../components/stream/WebcastPanel'
 import { WebcastSelector } from '../../components/stream/WebcastSelector'
 import { computeConflictMatchKeys, toMatchConflicts } from '../../domain/services/scheduleBuilder'
-import { deriveNextMatch, useWatchPageData } from '../../domain/services/watchPage'
+import { deriveNextMatch, deriveVisibleWebcastSet, useWatchPageData } from '../../domain/services/watchPage'
 import { getEffectiveTime } from '../../domain/services/persistentPreferences'
 import { useWatchPreferences } from '../../app/watchPreferencesContext'
 import type { UpcomingMatchAlert } from '../../domain/models/watch'
@@ -213,11 +213,19 @@ function readEventWebcastSelections(): Record<string, string> {
 
 export function WatchPage() {
   const { trackedTeams } = useWatchPreferences()
-  const { loadStatus, schedule, webcasts, selectedWebcastId, noApiKey, noSubscribedTeams } =
-    useWatchPageData()
+  const {
+    loadStatus,
+    schedule,
+    webcasts,
+    selectedWebcastId,
+    hasStaleWebcastStatuses,
+    noApiKey,
+    noSubscribedTeams,
+  } = useWatchPageData()
   const [, setClockTick] = useState(0)
   const [selectedQueuedMatchId, setSelectedQueuedMatchId] = useState<string | null>(null)
   const [autoShownMatchId, setAutoShownMatchId] = useState<string | null>(null)
+  const [webcastStatusMessage, setWebcastStatusMessage] = useState<string | null>(null)
   const [eventWebcastSelections, setEventWebcastSelections] = useState<Record<string, string>>(
     () => readEventWebcastSelections(),
   )
@@ -310,6 +318,112 @@ export function WatchPage() {
     }
   }, [queuedEntries, selectedQueuedMatchId])
 
+  const hasActiveEvents = (schedule?.teamStatuses ?? []).some((s) => s.status === 'ok')
+  const hasErrors = (schedule?.teamStatuses ?? []).some((s) => s.status === 'error')
+
+  const alerts: UpcomingMatchAlert[] = entries.map((entry, idx) => ({
+    alertId: `alert-${entry.matchKey}`,
+    matchId: entry.matchKey,
+    eventName: entry.eventName,
+    trackedTeamsInMatch: entry.subscribedTeamsInMatch,
+    allTeamKeys: entry.allTeamKeys,
+    subscribedTeamAlliances: entry.subscribedTeamAlliances,
+    startTime: entry.predictedTime !== null
+      ? new Date(entry.predictedTime * 1000).toISOString()
+      : new Date(Date.now() + (idx + 1) * 60000).toISOString(),
+    endTime: entry.predictedTime !== null
+      ? new Date((entry.predictedTime + 600) * 1000).toISOString()
+      : new Date(Date.now() + (idx + 1) * 60000 + 600000).toISOString(),
+    urgency: (() => {
+      if (!entry.predictedTime) return 'upcoming' as const
+      const diffMin = Math.floor((entry.predictedTime - effectiveUnix) / 60)
+      if (diffMin <= 0) return 'upcoming' as const
+      if (diffMin <= 15) return 'soon' as const
+      return 'upcoming' as const
+    })(),
+    priorityScore: idx,
+    label: entry.matchLabel,
+  }))
+
+  const conflictKeys = computeConflictMatchKeys(entries)
+  const conflicts = toMatchConflicts(conflictKeys, entries, teamPriorityById)
+  const nextThreeMatchKeys = new Set(entries.slice(0, 3).map((entry) => entry.matchKey))
+  const visibleConflicts = conflicts.filter((conflict) =>
+    conflict.impactedMatchIds.some((matchId) => nextThreeMatchKeys.has(matchId)),
+  )
+  const nextMatch = deriveNextMatch(entries, effectiveUnix)
+  const selectedQueuedEntry = queuedEntries.find((entry) => entry.matchKey === selectedQueuedMatchId) ?? null
+  const activeNextMatch = selectedQueuedEntry
+    ? toNextMatchInfo(selectedQueuedEntry, effectiveUnix)
+    : autoShownEntry
+    ? toNextMatchInfo(autoShownEntry, effectiveUnix)
+    : nextMatch
+
+  // Scope webcast pills to only the event for the match currently shown.
+  const currentShownEntry = activeNextMatch.entry ?? entries[0] ?? null
+  const eventScopedWebcasts = currentShownEntry
+    ? webcasts.filter((w) => w.eventKey === currentShownEntry.eventKey)
+    : []
+  const visibleWebcastSet = deriveVisibleWebcastSet(eventScopedWebcasts)
+  const visibleWebcasts = visibleWebcastSet.options
+
+  const currentEventKey = currentShownEntry?.eventKey ?? null
+  const rememberedWebcastId = currentEventKey ? eventWebcastSelections[currentEventKey] : null
+  const resolvedWebcastId = rememberedWebcastId ?? selectedWebcastId
+  const activeWebcast =
+    visibleWebcasts.find((w) => w.id === resolvedWebcastId) ?? visibleWebcasts[0] ?? null
+
+  useEffect(() => {
+    if (!currentEventKey || !resolvedWebcastId) {
+      setWebcastStatusMessage(null)
+      return
+    }
+
+    const isStillVisible = visibleWebcasts.some((webcast) => webcast.id === resolvedWebcastId)
+    if (isStillVisible) {
+      setWebcastStatusMessage(null)
+      return
+    }
+
+    const existedBeforeFilter = eventScopedWebcasts.some((webcast) => webcast.id === resolvedWebcastId)
+    if (!existedBeforeFilter) {
+      setWebcastStatusMessage(null)
+      return
+    }
+
+    if (visibleWebcastSet.mode === 'online-only') {
+      setWebcastStatusMessage('Your previously selected stream is no longer live. Switched to an available stream.')
+    }
+  }, [
+    currentEventKey,
+    eventScopedWebcasts,
+    resolvedWebcastId,
+    visibleWebcastSet.mode,
+    visibleWebcasts,
+  ])
+
+  useEffect(() => {
+    if (!currentEventKey || !activeWebcast) return
+
+    setEventWebcastSelections((previous) => {
+      if (previous[currentEventKey] === activeWebcast.id) {
+        return previous
+      }
+      return {
+        ...previous,
+        [currentEventKey]: activeWebcast.id,
+      }
+    })
+  }, [activeWebcast, currentEventKey])
+
+  const streamOverlayInfo = currentShownEntry
+    ? {
+        matchLabel: `${currentShownEntry.matchLabel} - ${currentShownEntry.eventName}`,
+        teams: currentShownEntry.subscribedTeamsInMatch,
+        timeToMatch: formatTimeToMatch(currentShownEntry.predictedTime, effectiveUnix),
+      }
+    : null
+
   if (noApiKey) {
     return (
       <PageShell
@@ -361,67 +475,6 @@ export function WatchPage() {
     )
   }
 
-  const hasActiveEvents = (schedule?.teamStatuses ?? []).some((s) => s.status === 'ok')
-  const hasErrors = (schedule?.teamStatuses ?? []).some((s) => s.status === 'error')
-
-  const alerts: UpcomingMatchAlert[] = entries.map((entry, idx) => ({
-    alertId: `alert-${entry.matchKey}`,
-    matchId: entry.matchKey,
-    eventName: entry.eventName,
-    trackedTeamsInMatch: entry.subscribedTeamsInMatch,
-    allTeamKeys: entry.allTeamKeys,
-    subscribedTeamAlliances: entry.subscribedTeamAlliances,
-    startTime: entry.predictedTime !== null
-      ? new Date(entry.predictedTime * 1000).toISOString()
-      : new Date(Date.now() + (idx + 1) * 60000).toISOString(),
-    endTime: entry.predictedTime !== null
-      ? new Date((entry.predictedTime + 600) * 1000).toISOString()
-      : new Date(Date.now() + (idx + 1) * 60000 + 600000).toISOString(),
-    urgency: (() => {
-      if (!entry.predictedTime) return 'upcoming' as const
-      const diffMin = Math.floor((entry.predictedTime - effectiveUnix) / 60)
-      if (diffMin <= 0) return 'upcoming' as const
-      if (diffMin <= 15) return 'soon' as const
-      return 'upcoming' as const
-    })(),
-    priorityScore: idx,
-    label: entry.matchLabel,
-  }))
-
-  const conflictKeys = computeConflictMatchKeys(entries)
-  const conflicts = toMatchConflicts(conflictKeys, entries, teamPriorityById)
-  const nextThreeMatchKeys = new Set(entries.slice(0, 3).map((entry) => entry.matchKey))
-  const visibleConflicts = conflicts.filter((conflict) =>
-    conflict.impactedMatchIds.some((matchId) => nextThreeMatchKeys.has(matchId)),
-  )
-  const nextMatch = deriveNextMatch(entries, effectiveUnix)
-  const selectedQueuedEntry = queuedEntries.find((entry) => entry.matchKey === selectedQueuedMatchId) ?? null
-  const activeNextMatch = selectedQueuedEntry
-    ? toNextMatchInfo(selectedQueuedEntry, effectiveUnix)
-    : autoShownEntry
-    ? toNextMatchInfo(autoShownEntry, effectiveUnix)
-    : nextMatch
-
-  // Scope webcast pills to only the event for the match currently shown.
-  const currentShownEntry = activeNextMatch.entry ?? entries[0] ?? null
-  const visibleWebcasts = currentShownEntry
-    ? webcasts.filter((w) => w.eventKey === currentShownEntry.eventKey)
-    : []
-
-  const currentEventKey = currentShownEntry?.eventKey ?? null
-  const rememberedWebcastId = currentEventKey ? eventWebcastSelections[currentEventKey] : null
-  const resolvedWebcastId = rememberedWebcastId ?? selectedWebcastId
-  const activeWebcast =
-    visibleWebcasts.find((w) => w.id === resolvedWebcastId) ?? visibleWebcasts[0] ?? null
-
-  const streamOverlayInfo = currentShownEntry
-    ? {
-        matchLabel: `${currentShownEntry.matchLabel} - ${currentShownEntry.eventName}`,
-        teams: currentShownEntry.subscribedTeamsInMatch,
-        timeToMatch: formatTimeToMatch(currentShownEntry.predictedTime, effectiveUnix),
-      }
-    : null
-
   return (
     <PageShell
       title="Watch"
@@ -453,6 +506,7 @@ export function WatchPage() {
           <WebcastSelector
             webcasts={visibleWebcasts}
             selectedId={activeWebcast?.id ?? resolvedWebcastId}
+            mode={visibleWebcastSet.mode}
             onSelect={(id) => {
               if (!currentEventKey) return
               setEventWebcastSelections((prev) => ({
@@ -465,6 +519,11 @@ export function WatchPage() {
             webcast={activeWebcast}
             hasActiveEvents={hasActiveEvents}
             overlayInfo={streamOverlayInfo}
+            showOfflineFallbackMessage={
+              visibleWebcastSet.mode === 'fallback-show-all' && eventScopedWebcasts.length > 0
+            }
+            showStaleStatusWarning={hasStaleWebcastStatuses || visibleWebcastSet.hasProbeFailures}
+            statusChangeMessage={webcastStatusMessage}
           />
         </div>
 
