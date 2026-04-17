@@ -126,6 +126,16 @@ const Button = styled.button<{ variant?: 'primary' | 'secondary' }>`
   `}
 `
 
+function buildWatchRedirectUrl(): string {
+  if (typeof window === 'undefined') {
+    return '/#/watch'
+  }
+
+  const normalizedPath = window.location.pathname.replace(/\/$/, '')
+  const basePath = normalizedPath === '/' ? '' : normalizedPath
+  return `${window.location.origin}${basePath}/#/watch`
+}
+
 export function SharePage() {
   const { payload } = useParams<{ payload: string }>()
   const [decoded, setDecoded] = useState<{ teams: string[]; apiKey: string | null } | null>(null)
@@ -134,14 +144,14 @@ export function SharePage() {
 
   useEffect(() => {
     if (!payload) {
-      window.location.replace('/#/watch')
+      window.location.replace(buildWatchRedirectUrl())
       return
     }
 
     const result = decodeSharePayload(payload)
     if (!result) {
       // Malformed payload - silently redirect
-      window.location.replace('/#/watch')
+      window.location.replace(buildWatchRedirectUrl())
       return
     }
 
@@ -162,12 +172,12 @@ export function SharePage() {
     })
 
     // Redirect to watch page with full reload
-    window.location.replace('/#/watch')
+    window.location.replace(buildWatchRedirectUrl())
   }
 
   const handleDecline = () => {
     // Redirect to watch page without making changes
-    window.location.replace('/#/watch')
+    window.location.replace(buildWatchRedirectUrl())
   }
 
   if (loading || !decoded) {
