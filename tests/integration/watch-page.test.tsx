@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/app/App'
 import {
@@ -120,7 +120,11 @@ describe('watch page', () => {
     window.history.pushState({}, '', '/#/watch')
     render(<App />)
 
-    expect(await screen.findByTestId('watch-offline-fallback-message')).toBeInTheDocument()
-    expect(await screen.findByText('Offline')).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('tab', { name: /Houston District · YouTube/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('watch-offline-fallback-message')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Offline')).toBeInTheDocument()
   })
 })

@@ -177,4 +177,5 @@ export interface WatchPageState {
   hasStaleWebcastStatuses: boolean
   noApiKey: boolean
   noSubscribedTeams: boolean
+  refreshWebcastAvailability: (eventWebcasts: WebcastOption[], preferredWebcastId?: string | null) => Promise<void>
 }

@@ -221,6 +221,7 @@ export function WatchPage() {
     hasStaleWebcastStatuses,
     noApiKey,
     noSubscribedTeams,
+    refreshWebcastAvailability,
   } = useWatchPageData()
   const [, setClockTick] = useState(0)
   const [selectedQueuedMatchId, setSelectedQueuedMatchId] = useState<string | null>(null)
@@ -269,6 +270,7 @@ export function WatchPage() {
   )
   const autoShownEntry = autoSwitchDecision.entry
   const previousAutoShownMatchIdRef = useRef<string | null>(null)
+  const previousActiveWebcastIdRef = useRef<string | null>(null)
   const autoShownMatchKey = autoShownEntry?.matchKey ?? null
 
   useEffect(() => {
@@ -415,6 +417,28 @@ export function WatchPage() {
       }
     })
   }, [activeWebcast, currentEventKey])
+
+  useEffect(() => {
+    if (!currentEventKey || !activeWebcast) return
+
+    const previousActiveWebcastId = previousActiveWebcastIdRef.current
+    previousActiveWebcastIdRef.current = activeWebcast.id
+
+    const didSwitchWebcast =
+      previousActiveWebcastId !== null && previousActiveWebcastId !== activeWebcast.id
+
+    if (!didSwitchWebcast) return
+
+    const hasUncheckedYoutubeWebcasts = eventScopedWebcasts.some(
+      (webcast) => webcast.platform === 'youtube' && webcast.availabilityCheckedAt === null,
+    )
+
+    if (!hasUncheckedYoutubeWebcasts) return
+
+    refreshWebcastAvailability(eventScopedWebcasts, activeWebcast.id).catch(() => {
+      // The hook records stale status; nothing else to do in the page.
+    })
+  }, [activeWebcast, currentEventKey, eventScopedWebcasts, refreshWebcastAvailability])
 
   const streamOverlayInfo = currentShownEntry
     ? {

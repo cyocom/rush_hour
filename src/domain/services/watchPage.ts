@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import type {
   AvailabilityProbeResult,
@@ -220,6 +220,32 @@ function mergeAvailability(
   })
 }
 
+function mergeAvailabilityIntoExisting(
+  existingWebcasts: WebcastOption[],
+  availabilityResults: AvailabilityProbeResult[],
+): WebcastOption[] {
+  const availabilityById = new Map(
+    availabilityResults.map((result) => [result.webcastId, result] as const),
+  )
+
+  return existingWebcasts.map((webcast) => {
+    const resolved = availabilityById.get(webcast.id)
+    if (!resolved) return webcast
+
+    return {
+      ...webcast,
+      availability: resolved.availability,
+      availabilityCheckedAt: resolved.checkedAt,
+    }
+  })
+}
+
+function hasAvailabilityProbeFailures(results: AvailabilityProbeResult[]): boolean {
+  return results.some(
+    (result) => result.reason === 'probe-timeout' || result.reason === 'probe-error',
+  )
+}
+
 // ─── Data hook ───────────────────────────────────────────────────────────────
 
 export function useWatchPageData(): WatchPageState {
@@ -230,6 +256,33 @@ export function useWatchPageData(): WatchPageState {
   const [hasStaleWebcastStatuses, setHasStaleWebcastStatuses] = useState(false)
   const [noApiKey, setNoApiKey] = useState(false)
   const [noSubscribedTeams, setNoSubscribedTeams] = useState(false)
+
+  const refreshWebcastAvailability = useCallback(
+    async (eventWebcasts: WebcastOption[], preferredWebcastId?: string | null): Promise<void> => {
+      if (eventWebcasts.length === 0) return
+
+      const availabilityResults = await resolveWebcastAvailability(eventWebcasts)
+      const hasProbeFailures = hasAvailabilityProbeFailures(availabilityResults)
+
+      logVerbose('Merged webcast availability results', {
+        availabilityResults,
+        hasProbeFailures,
+      })
+
+      setWebcasts((current) =>
+        mergeAvailabilityIntoExisting(current, availabilityResults),
+      )
+      setHasStaleWebcastStatuses(hasProbeFailures)
+
+      if (preferredWebcastId !== undefined) {
+        setSelectedWebcastId((current) => {
+          if (preferredWebcastId === null) return current
+          return preferredWebcastId
+        })
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -441,39 +494,6 @@ export function useWatchPageData(): WatchPageState {
         return webcastOptions[0]?.id ?? null
       })
 
-      resolveWebcastAvailability(webcastOptions)
-        .then((availabilityResults) => {
-          if (cancelled) return
-
-          const resolvedWebcasts = mergeAvailability(webcastOptions, availabilityResults)
-          const hasProbeFailures = availabilityResults.some(
-            (result) => result.reason === 'probe-timeout' || result.reason === 'probe-error',
-          )
-
-          logVerbose('Merged webcast availability results', {
-            availabilityResults,
-            hasProbeFailures,
-            resolved: resolvedWebcasts.map((webcast) => ({
-              id: webcast.id,
-              platform: webcast.platform,
-              availability: webcast.availability,
-            })),
-          })
-
-          setWebcasts(resolvedWebcasts)
-          setHasStaleWebcastStatuses(hasProbeFailures)
-          setSelectedWebcastId((current) => {
-            if (current && resolvedWebcasts.some((option) => option.id === current)) {
-              return current
-            }
-            return resolvedWebcasts[0]?.id ?? null
-          })
-        })
-        .catch(() => {
-          if (cancelled) return
-          setHasStaleWebcastStatuses(true)
-        })
-
       setLoadStatus('done')
     }
 
@@ -505,5 +525,6 @@ export function useWatchPageData(): WatchPageState {
     hasStaleWebcastStatuses,
     noApiKey,
     noSubscribedTeams,
+    refreshWebcastAvailability,
   }
 }
