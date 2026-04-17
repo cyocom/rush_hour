@@ -2,6 +2,29 @@ import { format } from 'date-fns'
 import type { MatchConflict } from '../models/watch'
 import type { ScheduledMatchEntry, TBACompLevel, TBAEvent, TBAMatchSimple } from '../models/schedule'
 
+type ScheduleBuilderLogLevel = 'silent' | 'info' | 'verbose'
+
+function getScheduleBuilderLogLevel(): ScheduleBuilderLogLevel {
+  const value = String(import.meta.env.VITE_SCHEDULE_BUILDER_LOG_LEVEL ?? 'verbose').toLowerCase()
+  if (value === 'silent' || value === 'info' || value === 'verbose') {
+    return value
+  }
+  return 'verbose'
+}
+
+function shouldLogScheduleBuilder(level: Exclude<ScheduleBuilderLogLevel, 'silent'>): boolean {
+  if (!import.meta.env.DEV) return false
+  const configured = getScheduleBuilderLogLevel()
+  if (configured === 'silent') return false
+  if (configured === 'info') return level === 'info'
+  return true
+}
+
+function scheduleBuilderVerbose(message: string, ...args: unknown[]): void {
+  if (!shouldLogScheduleBuilder('verbose')) return
+  console.debug(`[scheduleBuilder][verbose] ${message}`, ...args)
+}
+
 const COMP_LEVEL_ORDER: Record<TBACompLevel, number> = {
   qm: 0,
   ef: 1,
@@ -23,35 +46,31 @@ const COMP_LEVEL_LABELS: Record<TBACompLevel, string> = {
  * [start_date, end_date] (inclusive, YYYY-MM-DD string comparison).
  */
 export function findActiveEvent(events: TBAEvent[], effectiveDate: string): TBAEvent | null {
-  if (import.meta.env.DEV) {
-    console.group(`[scheduleBuilder] findActiveEvent — effectiveDate: "${effectiveDate}", ${events.length} event(s)`)
-  }
+  scheduleBuilderVerbose(
+    `findActiveEvent — effectiveDate: "${effectiveDate}", ${events.length} event(s)`,
+  )
   let match: TBAEvent | null = null
 
   for (const event of events) {
     const inRange = effectiveDate >= event.start_date && effectiveDate <= event.end_date
-    if (import.meta.env.DEV) {
-      console.log(
-        `  ${inRange ? '✅' : '❌'} ${event.key} "${event.name}" [${event.start_date} → ${event.end_date}]${inRange ? ' ← ACTIVE' : ''}`,
-      )
-    }
+    scheduleBuilderVerbose(
+      `${inRange ? 'ACTIVE' : 'skip'} ${event.key} "${event.name}" [${event.start_date} -> ${event.end_date}]`,
+    )
     if (inRange && match === null) {
       match = event
     }
   }
 
-  if (import.meta.env.DEV) {
-    if (match === null) console.warn(`  ⚠️  No active event found for effectiveDate "${effectiveDate}"`)
-    console.groupEnd()
+  if (match === null && shouldLogScheduleBuilder('info')) {
+    console.info(`[scheduleBuilder][info] No active event found for effectiveDate "${effectiveDate}"`)
   }
   return match
 }
 
 /**
  * Filters to matches that are upcoming (not yet played) relative to effectiveTimeUnix.
- * - Matches with `predicted_time > effectiveTimeUnix` are included.
- * - Matches with `predicted_time === null` and `winning_alliance === null` are included
- *   (edge case: time unavailable, but match hasn't been played).
+ * A match is considered upcoming until TBA reports it as played (winner posted),
+ * even if predicted_time has already passed.
  */
 export function filterUpcomingMatches(
   matches: TBAMatchSimple[],
@@ -59,20 +78,22 @@ export function filterUpcomingMatches(
   isSimulated = false,
 ): TBAMatchSimple[] {
   // TBA returns winning_alliance as "" (empty string) for unplayed matches, not null.
-  // When simulating, a match may already have a TBA result but the simulated time is
-  // before it was played — so skip the winner check and rely solely on predicted_time.
+  // In simulated mode, keep using simulated timeline for played matches so users can
+  // rewind to before completion.
   const upcoming = matches.filter((m) => {
-    if (!isSimulated && m.winning_alliance) return false  // already has a winner (live mode only)
-    if (m.predicted_time === null) return true            // no time yet → include
-    return m.predicted_time > effectiveTimeUnix
+    if (!m.winning_alliance) return true                  // score not posted yet
+    if (m.predicted_time === null) return false
+    if (isSimulated) return m.predicted_time > effectiveTimeUnix
+    return false
   })
-  if (import.meta.env.DEV) {
-    console.log(
-      `[scheduleBuilder] filterUpcomingMatches: ${matches.length} total → ${upcoming.length} upcoming` +
-      ` (effectiveUnix=${effectiveTimeUnix})`,
-      matches.map((m) => ({ key: m.key, winning_alliance: m.winning_alliance, predicted_time: m.predicted_time })),
-    )
-  }
+  scheduleBuilderVerbose(
+    `filterUpcomingMatches: ${matches.length} total -> ${upcoming.length} upcoming (effectiveUnix=${effectiveTimeUnix})`,
+    matches.map((m) => ({
+      key: m.key,
+      winning_alliance: m.winning_alliance,
+      predicted_time: m.predicted_time,
+    })),
+  )
   return upcoming
 }
 
@@ -123,7 +144,8 @@ export function toScheduledMatchEntry(
     subscribedTeamAlliances,
     predictedTime: match.predicted_time,
     hasPredictedTime: match.predicted_time !== null,
-    isPlayed: match.winning_alliance !== null,
+    // TBA uses "" for unplayed matches and "red"/"blue" when played.
+    isPlayed: !!match.winning_alliance,
   }
 }
 
@@ -201,6 +223,7 @@ export function computeConflictMatchKeys(entries: ScheduledMatchEntry[]): Set<st
 export function toMatchConflicts(
   conflictKeys: Set<string>,
   entries: ScheduledMatchEntry[],
+  teamPriorityById: Record<string, number> = {},
 ): MatchConflict[] {
   if (conflictKeys.size === 0) return []
 
@@ -228,7 +251,14 @@ export function toMatchConflicts(
       const allTeams = Array.from(
         new Set([...a.subscribedTeamsInMatch, ...b.subscribedTeamsInMatch]),
       )
-      const highestPriorityTeamId = a.subscribedTeamsInMatch[0] ?? b.subscribedTeamsInMatch[0]
+      const highestPriorityTeamId = allTeams
+        .slice()
+        .sort((teamA, teamB) => {
+          const rankA = teamPriorityById[teamA] ?? Number.POSITIVE_INFINITY
+          const rankB = teamPriorityById[teamB] ?? Number.POSITIVE_INFINITY
+          if (rankA !== rankB) return rankA - rankB
+          return teamA.localeCompare(teamB)
+        })[0]
 
       conflicts.push({
         conflictId: `conflict-${a.matchKey}-${b.matchKey}`,

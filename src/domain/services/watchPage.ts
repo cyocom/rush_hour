@@ -23,6 +23,7 @@ import { fetchEventDetail, fetchEventMatches, fetchTeamEvents } from './tbaClien
 
 const CURRENT_SEASON_YEAR = new Date().getFullYear()
 const SOON_THRESHOLD_SECONDS = 600 // 10 minutes
+const WATCH_DATA_REFRESH_MS = 60_000
 
 // ─── Pure functions ──────────────────────────────────────────────────────────
 
@@ -49,9 +50,9 @@ export function deriveNextMatch(
     return { status: 'none', entry: null, minutesUntil: null }
   }
 
-  // In progress: predicted time has passed but match isn't played yet
+  // Keep as upcoming until TBA reports match as played (score posted).
   if (first.predictedTime <= effectiveUnix && !first.isPlayed) {
-    return { status: 'in-progress', entry: first, minutesUntil: 0 }
+    return { status: 'upcoming', entry: first, minutesUntil: 0 }
   }
 
   // If first entry is already played, find next upcoming
@@ -147,31 +148,49 @@ export function useWatchPageData(): WatchPageState {
   const [noSubscribedTeams, setNoSubscribedTeams] = useState(false)
 
   useEffect(() => {
-    const prefs = readPersistentPreferences()
+    let cancelled = false
 
-    if (!prefs.tbaApiKey) {
-      setNoApiKey(true)
-      return
-    }
-
-    if (prefs.subscribedTeams.length === 0) {
-      setNoSubscribedTeams(true)
-      return
-    }
-
-    setLoadStatus('loading')
-
-    const effectiveDate = getEffectiveTime()
-    const effectiveDateStr = format(effectiveDate, 'yyyy-MM-dd')
-    const effectiveUnix = Math.floor(effectiveDate.getTime() / 1000)
-    const year = effectiveDate.getFullYear() || CURRENT_SEASON_YEAR
-
-    async function load() {
+    async function load(showLoading: boolean) {
       const prefs = readPersistentPreferences()
+
+      if (!prefs.tbaApiKey) {
+        if (cancelled) return
+        setNoApiKey(true)
+        setNoSubscribedTeams(false)
+        setSchedule(null)
+        setWebcasts([])
+        setSelectedWebcastId(null)
+        setLoadStatus('done')
+        return
+      }
+
+      if (prefs.subscribedTeams.length === 0) {
+        if (cancelled) return
+        setNoSubscribedTeams(true)
+        setNoApiKey(false)
+        setSchedule(null)
+        setWebcasts([])
+        setSelectedWebcastId(null)
+        setLoadStatus('done')
+        return
+      }
+
+      if (!cancelled) {
+        setNoApiKey(false)
+        setNoSubscribedTeams(false)
+        if (showLoading) {
+          setLoadStatus('loading')
+        }
+      }
+
       const apiKey = prefs.tbaApiKey
       const teams = prefs.subscribedTeams
       const subscribedTeamIds = teams.map((t) => t.teamId)
       const isSimulated = prefs.simulationClock.enabled && !!prefs.simulationClock.simulatedISOString
+      const effectiveDate = getEffectiveTime()
+      const effectiveDateStr = format(effectiveDate, 'yyyy-MM-dd')
+      const effectiveUnix = Math.floor(effectiveDate.getTime() / 1000)
+      const year = effectiveDate.getFullYear() || CURRENT_SEASON_YEAR
 
       // ── 1. Fetch events for all teams in parallel ─────────────────────────
       const eventResults = await Promise.allSettled(
@@ -319,13 +338,37 @@ export function useWatchPageData(): WatchPageState {
         typeof window !== 'undefined' ? window.location.hostname : 'localhost'
       const webcastOptions = buildWebcastOptions(eventDetails, hostname, priorityEventKey)
 
+      if (cancelled) return
+
       setSchedule(unifiedSchedule)
       setWebcasts(webcastOptions)
-      setSelectedWebcastId(webcastOptions[0]?.id ?? null)
+      setSelectedWebcastId((current) => {
+        if (current && webcastOptions.some((option) => option.id === current)) {
+          return current
+        }
+        return webcastOptions[0]?.id ?? null
+      })
       setLoadStatus('done')
     }
 
-    load().catch(() => setLoadStatus('done'))
+    load(true).catch(() => {
+      if (!cancelled) {
+        setLoadStatus('done')
+      }
+    })
+
+    const timer = window.setInterval(() => {
+      load(false).catch(() => {
+        if (!cancelled) {
+          setLoadStatus('done')
+        }
+      })
+    }, WATCH_DATA_REFRESH_MS)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [])
 
   return {

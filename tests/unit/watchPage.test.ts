@@ -48,10 +48,10 @@ describe('deriveNextMatch', () => {
     expect(result).toEqual({ status: 'none', entry: null, minutesUntil: null })
   })
 
-  it('returns in-progress when first match already started and is not played', () => {
+  it('returns upcoming when first match already started but is not played', () => {
     const entries = [makeEntry({ predictedTime: 900, isPlayed: false })]
     const result = deriveNextMatch(entries, 1_000)
-    expect(result.status).toBe('in-progress')
+    expect(result.status).toBe('upcoming')
     expect(result.minutesUntil).toBe(0)
     expect(result.entry?.matchKey).toBe('2026tx_qm1')
   })

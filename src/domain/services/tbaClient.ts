@@ -26,6 +26,14 @@ interface CacheEntry<T> {
   expiresAt: number // absolute ms timestamp
 }
 
+interface FetchJsonOptions {
+  /**
+   * When true, always hit the network and use If-None-Match for validation
+   * when cached data exists. Use this for time-sensitive checks (e.g. scores).
+   */
+  revalidateAlways?: boolean
+}
+
 function cacheKey(url: string): string {
   return CACHE_PREFIX + encodeURIComponent(url)
 }
@@ -57,12 +65,17 @@ function parseMaxAgeMs(cacheControl: string | null): number | null {
   return match ? parseInt(match[1], 10) * 1000 : null
 }
 
-async function fetchJson<T>(path: string, apiKey: string, teamId: string | null = null): Promise<T> {
+async function fetchJson<T>(
+  path: string,
+  apiKey: string,
+  teamId: string | null = null,
+  options: FetchJsonOptions = {},
+): Promise<T> {
   const url = `${TBA_BASE_URL}${path}`
   const cached = getCacheEntry<T>(url)
 
-  // If cached data hasn't expired yet, return it immediately without hitting the network.
-  if (cached && Date.now() < cached.expiresAt) {
+  // Default behavior: use local TTL short-circuit to avoid unnecessary network calls.
+  if (!options.revalidateAlways && cached && Date.now() < cached.expiresAt) {
     return cached.data
   }
 
@@ -78,7 +91,7 @@ async function fetchJson<T>(path: string, apiKey: string, teamId: string | null 
   const response = await fetch(url, { headers })
 
   // 304 Not Modified — server confirmed our cached data is still current.
-  // Refresh the TTL so we don't revalidate again immediately.
+  // Keep the cached payload and update metadata.
   if (response.status === 304 && cached) {
     const maxAgeMs = parseMaxAgeMs(response.headers.get('Cache-Control')) ?? FALLBACK_TTL_MS
     setCacheEntry(url, { ...cached, expiresAt: Date.now() + maxAgeMs })
@@ -105,7 +118,9 @@ export function fetchTeamEvents(teamId: string, year: number, apiKey: string): P
 }
 
 export function fetchEventMatches(eventKey: string, apiKey: string): Promise<TBAMatchSimple[]> {
-  return fetchJson<TBAMatchSimple[]>(`/event/${eventKey}/matches/simple`, apiKey, null)
+  return fetchJson<TBAMatchSimple[]>(`/event/${eventKey}/matches/simple`, apiKey, null, {
+    revalidateAlways: true,
+  })
 }
 
 export function fetchEventDetail(eventKey: string, apiKey: string): Promise<TBAEventDetail> {
