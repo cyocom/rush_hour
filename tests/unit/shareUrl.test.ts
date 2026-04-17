@@ -69,6 +69,15 @@ describe('shareUrl service', () => {
       expect(url).toMatch(/^https?:\/\/.+\/#\/share\/[A-Za-z0-9\-_]+$/)
     })
 
+    it('should preserve base path when deployed under a subdirectory', () => {
+      window.history.pushState({}, 'test', '/rush_hour/#/config')
+
+      const url = buildShareUrl(['frc254'], null)
+      expect(url).toContain('/rush_hour/#/share/')
+
+      window.history.pushState({}, 'test', '/')
+    })
+
     it('should include API key when includeApiKey is true', () => {
       const url = buildShareUrl(['frc254'], 'test-key', true)
       const encoded = url.split('/#/share/')[1]

@@ -74,8 +74,15 @@ export function buildShareUrl(teams: string[], apiKey: string | null, includeApi
   }
 
   const encoded = encodePayload(payload)
-  const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  return `${origin}/#/share/${encoded}`
+  if (typeof window === 'undefined') {
+    return `/#/share/${encoded}`
+  }
+
+  const origin = window.location.origin
+  // Preserve deploy sub-paths like /rush_hour/ when building share URLs.
+  const normalizedPath = window.location.pathname.replace(/\/$/, '')
+  const basePath = normalizedPath === '/' ? '' : normalizedPath
+  return `${origin}${basePath}/#/share/${encoded}`
 }
 
 /**
