@@ -10,11 +10,21 @@ interface WebcastPanelProps {
   webcast: WebcastOption | null
   hasActiveEvents: boolean
   overlayInfo?: StreamOverlayInfo | null
+  showOfflineFallbackMessage?: boolean
+  showStaleStatusWarning?: boolean
+  statusChangeMessage?: string | null
 }
 
 const STREAM_MIN_HEIGHT = 'clamp(620px, 75vh, 1120px)'
 
-export function WebcastPanel({ webcast, hasActiveEvents, overlayInfo = null }: WebcastPanelProps) {
+export function WebcastPanel({
+  webcast,
+  hasActiveEvents,
+  overlayInfo = null,
+  showOfflineFallbackMessage = false,
+  showStaleStatusWarning = false,
+  statusChangeMessage = null,
+}: WebcastPanelProps) {
   if (!webcast) {
     return (
       <div
@@ -97,6 +107,26 @@ export function WebcastPanel({ webcast, hasActiveEvents, overlayInfo = null }: W
           <p className="mt-1 text-xs text-white/80">
             Teams: {overlayInfo.teams.join(', ')}
           </p>
+        </div>
+      )}
+
+      {(showOfflineFallbackMessage || showStaleStatusWarning || statusChangeMessage) && (
+        <div className="absolute bottom-3 left-3 right-3 grid gap-2 rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs text-white/90 backdrop-blur-sm">
+          {showOfflineFallbackMessage && (
+            <p data-testid="watch-offline-fallback-message" className="font-bold">
+              No streams are currently online. Showing available streams marked offline.
+            </p>
+          )}
+          {showStaleStatusWarning && (
+            <p data-testid="watch-stale-status-warning" className="text-white/80">
+              Some stream statuses may be stale.
+            </p>
+          )}
+          {statusChangeMessage && (
+            <p data-testid="watch-status-change-message" className="text-white">
+              {statusChangeMessage}
+            </p>
+          )}
         </div>
       )}
     </div>

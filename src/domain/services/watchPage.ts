@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import type {
+  AvailabilityProbeResult,
   NextMatchInfo,
   NextMatchStatus,
   ScheduledMatchEntry,
+  StreamAvailability,
   TBAEventDetail,
   UnifiedSchedule,
+  VisibleWebcastSet,
   WatchPageLoadStatus,
   WatchPageState,
   WebcastOption,
@@ -19,11 +22,21 @@ import {
   toScheduledMatchEntry,
 } from './scheduleBuilder'
 import { getEffectiveTime, readPersistentPreferences } from './persistentPreferences'
+import { resolveWebcastAvailability } from './streamAvailability'
 import { fetchEventDetail, fetchEventMatches, fetchTeamEvents } from './tbaClient'
 
 const CURRENT_SEASON_YEAR = new Date().getFullYear()
 const SOON_THRESHOLD_SECONDS = 600 // 10 minutes
 const WATCH_DATA_REFRESH_MS = 60_000
+
+function logVerbose(message: string, context?: Record<string, unknown>): void {
+  if (!import.meta.env.DEV) return
+  if (context) {
+    console.debug(`[watchPage][verbose] ${message}`, context)
+    return
+  }
+  console.debug(`[watchPage][verbose] ${message}`)
+}
 
 // ─── Pure functions ──────────────────────────────────────────────────────────
 
@@ -130,11 +143,81 @@ export function buildWebcastOptions(
         label: `${event.name} · ${platformLabel}`,
         embedUrl,
         externalUrl,
+        availability: 'unknown',
+        availabilityCheckedAt: null,
       })
     }
   }
 
   return options
+}
+
+export function deriveVisibleWebcastSet(webcasts: WebcastOption[]): VisibleWebcastSet {
+  const hasAnyOnline = webcasts.some((webcast) => webcast.availability === 'online')
+  const hasProbeFailures = webcasts.some(
+    (webcast) => webcast.platform === 'youtube' && webcast.availability === 'unknown',
+  )
+
+  if (!hasAnyOnline) {
+    const fallbackSet: VisibleWebcastSet = {
+      mode: 'fallback-show-all',
+      options: webcasts,
+      hasAnyOnline,
+      hasProbeFailures,
+    }
+
+    logVerbose('Derived webcast visibility set', {
+      mode: fallbackSet.mode,
+      hasAnyOnline: fallbackSet.hasAnyOnline,
+      hasProbeFailures: fallbackSet.hasProbeFailures,
+      optionIds: fallbackSet.options.map((option) => option.id),
+    })
+
+    return fallbackSet
+  }
+
+  const onlineOnlySet: VisibleWebcastSet = {
+    mode: 'online-only',
+    options: webcasts.filter((webcast) => {
+      if (webcast.platform !== 'youtube') return true
+      return webcast.availability === 'online'
+    }),
+    hasAnyOnline,
+    hasProbeFailures,
+  }
+
+  logVerbose('Derived webcast visibility set', {
+    mode: onlineOnlySet.mode,
+    hasAnyOnline: onlineOnlySet.hasAnyOnline,
+    hasProbeFailures: onlineOnlySet.hasProbeFailures,
+    optionIds: onlineOnlySet.options.map((option) => option.id),
+  })
+
+  return onlineOnlySet
+}
+
+function mergeAvailability(
+  webcasts: WebcastOption[],
+  availabilityResults: AvailabilityProbeResult[],
+): WebcastOption[] {
+  const byId = new Map<string, { availability: StreamAvailability; checkedAt: string }>()
+
+  availabilityResults.forEach((result) => {
+    byId.set(result.webcastId, {
+      availability: result.availability,
+      checkedAt: result.checkedAt,
+    })
+  })
+
+  return webcasts.map((webcast) => {
+    const resolved = byId.get(webcast.id)
+    if (!resolved) return webcast
+    return {
+      ...webcast,
+      availability: resolved.availability,
+      availabilityCheckedAt: resolved.checkedAt,
+    }
+  })
 }
 
 // ─── Data hook ───────────────────────────────────────────────────────────────
@@ -144,6 +227,7 @@ export function useWatchPageData(): WatchPageState {
   const [schedule, setSchedule] = useState<UnifiedSchedule | null>(null)
   const [webcasts, setWebcasts] = useState<WebcastOption[]>([])
   const [selectedWebcastId, setSelectedWebcastId] = useState<string | null>(null)
+  const [hasStaleWebcastStatuses, setHasStaleWebcastStatuses] = useState(false)
   const [noApiKey, setNoApiKey] = useState(false)
   const [noSubscribedTeams, setNoSubscribedTeams] = useState(false)
 
@@ -160,6 +244,7 @@ export function useWatchPageData(): WatchPageState {
         setSchedule(null)
         setWebcasts([])
         setSelectedWebcastId(null)
+        setHasStaleWebcastStatuses(false)
         setLoadStatus('done')
         return
       }
@@ -171,6 +256,7 @@ export function useWatchPageData(): WatchPageState {
         setSchedule(null)
         setWebcasts([])
         setSelectedWebcastId(null)
+        setHasStaleWebcastStatuses(false)
         setLoadStatus('done')
         return
       }
@@ -338,16 +424,56 @@ export function useWatchPageData(): WatchPageState {
         typeof window !== 'undefined' ? window.location.hostname : 'localhost'
       const webcastOptions = buildWebcastOptions(eventDetails, hostname, priorityEventKey)
 
+      logVerbose('Built raw webcast options', {
+        count: webcastOptions.length,
+        optionIds: webcastOptions.map((option) => option.id),
+      })
+
       if (cancelled) return
 
       setSchedule(unifiedSchedule)
       setWebcasts(webcastOptions)
+      setHasStaleWebcastStatuses(false)
       setSelectedWebcastId((current) => {
         if (current && webcastOptions.some((option) => option.id === current)) {
           return current
         }
         return webcastOptions[0]?.id ?? null
       })
+
+      resolveWebcastAvailability(webcastOptions)
+        .then((availabilityResults) => {
+          if (cancelled) return
+
+          const resolvedWebcasts = mergeAvailability(webcastOptions, availabilityResults)
+          const hasProbeFailures = availabilityResults.some(
+            (result) => result.reason === 'probe-timeout' || result.reason === 'probe-error',
+          )
+
+          logVerbose('Merged webcast availability results', {
+            availabilityResults,
+            hasProbeFailures,
+            resolved: resolvedWebcasts.map((webcast) => ({
+              id: webcast.id,
+              platform: webcast.platform,
+              availability: webcast.availability,
+            })),
+          })
+
+          setWebcasts(resolvedWebcasts)
+          setHasStaleWebcastStatuses(hasProbeFailures)
+          setSelectedWebcastId((current) => {
+            if (current && resolvedWebcasts.some((option) => option.id === current)) {
+              return current
+            }
+            return resolvedWebcasts[0]?.id ?? null
+          })
+        })
+        .catch(() => {
+          if (cancelled) return
+          setHasStaleWebcastStatuses(true)
+        })
+
       setLoadStatus('done')
     }
 
@@ -376,6 +502,7 @@ export function useWatchPageData(): WatchPageState {
     schedule,
     webcasts,
     selectedWebcastId,
+    hasStaleWebcastStatuses,
     noApiKey,
     noSubscribedTeams,
   }

@@ -122,6 +122,30 @@ export interface TBAEventDetail extends TBAEvent {
 
 export type WebcastPlatform = 'twitch' | 'youtube' | 'unsupported'
 
+export type StreamAvailability = 'online' | 'offline' | 'unknown'
+
+export type AvailabilityProbeReason =
+  | 'probe-success'
+  | 'probe-timeout'
+  | 'probe-error'
+  | 'unsupported-provider'
+
+export interface AvailabilityProbeResult {
+  webcastId: string
+  availability: StreamAvailability
+  checkedAt: string
+  reason: AvailabilityProbeReason
+}
+
+export type WebcastVisibilityMode = 'online-only' | 'fallback-show-all'
+
+export interface VisibleWebcastSet {
+  mode: WebcastVisibilityMode
+  options: WebcastOption[]
+  hasAnyOnline: boolean
+  hasProbeFailures: boolean
+}
+
 export interface WebcastOption {
   id: string
   platform: WebcastPlatform
@@ -131,6 +155,8 @@ export interface WebcastOption {
   label: string
   embedUrl: string | null
   externalUrl: string
+  availability: StreamAvailability
+  availabilityCheckedAt: string | null
 }
 
 export type NextMatchStatus = 'upcoming' | 'soon' | 'in-progress' | 'none'
@@ -148,6 +174,7 @@ export interface WatchPageState {
   schedule: UnifiedSchedule | null
   webcasts: WebcastOption[]
   selectedWebcastId: string | null
+  hasStaleWebcastStatuses: boolean
   noApiKey: boolean
   noSubscribedTeams: boolean
 }

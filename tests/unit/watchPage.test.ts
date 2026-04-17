@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ScheduledMatchEntry, TBAEventDetail } from '../../src/domain/models/schedule'
-import { buildWebcastOptions, deriveNextMatch } from '../../src/domain/services/watchPage'
+import { buildWebcastOptions, deriveNextMatch, deriveVisibleWebcastSet } from '../../src/domain/services/watchPage'
 
 function makeEntry(overrides: Partial<ScheduledMatchEntry>): ScheduledMatchEntry {
   return {
@@ -99,8 +99,12 @@ describe('buildWebcastOptions', () => {
     expect(options[0].platform).toBe('twitch')
     expect(options[0].embedUrl).toContain('player.twitch.tv')
     expect(options[0].embedUrl).toContain('parent=localhost')
+    expect(options[0].availability).toBe('unknown')
+    expect(options[0].availabilityCheckedAt).toBeNull()
     expect(options[1].platform).toBe('youtube')
     expect(options[1].embedUrl).toBe('https://www.youtube.com/embed/abc123video?autoplay=1&rel=0')
+    expect(options[1].availability).toBe('unknown')
+    expect(options[1].availabilityCheckedAt).toBeNull()
   })
 
   it('returns unsupported platform fallback with external URL', () => {
@@ -116,5 +120,117 @@ describe('buildWebcastOptions', () => {
     expect(options[0].platform).toBe('unsupported')
     expect(options[0].embedUrl).toBeNull()
     expect(options[0].externalUrl).toBe('https://stream.example.com/watch')
+  })
+})
+
+describe('deriveVisibleWebcastSet', () => {
+  it('uses online-only mode when any stream is online', () => {
+    const webcasts = [
+      {
+        id: 'event:twitch:foo',
+        platform: 'twitch' as const,
+        channel: 'foo',
+        eventKey: 'event',
+        eventName: 'Event',
+        label: 'Event · Twitch',
+        embedUrl: 'https://player.twitch.tv/?channel=foo',
+        externalUrl: 'https://twitch.tv/foo',
+        availability: 'unknown' as const,
+        availabilityCheckedAt: null,
+      },
+      {
+        id: 'event:youtube:bar',
+        platform: 'youtube' as const,
+        channel: 'bar',
+        eventKey: 'event',
+        eventName: 'Event',
+        label: 'Event · YouTube',
+        embedUrl: 'https://www.youtube.com/embed/bar?autoplay=1&rel=0',
+        externalUrl: 'https://www.youtube.com/watch?v=bar',
+        availability: 'online' as const,
+        availabilityCheckedAt: '2026-04-17T00:00:00.000Z',
+      },
+      {
+        id: 'event:youtube:baz',
+        platform: 'youtube' as const,
+        channel: 'baz',
+        eventKey: 'event',
+        eventName: 'Event',
+        label: 'Event · YouTube',
+        embedUrl: 'https://www.youtube.com/embed/baz?autoplay=1&rel=0',
+        externalUrl: 'https://www.youtube.com/watch?v=baz',
+        availability: 'offline' as const,
+        availabilityCheckedAt: '2026-04-17T00:00:00.000Z',
+      },
+    ]
+
+    const visible = deriveVisibleWebcastSet(webcasts)
+
+    expect(visible.mode).toBe('online-only')
+    expect(visible.options).toHaveLength(2)
+    expect(visible.options.map((option) => option.id)).toEqual([
+      'event:twitch:foo',
+      'event:youtube:bar',
+    ])
+    expect(visible.hasAnyOnline).toBe(true)
+    expect(visible.hasProbeFailures).toBe(false)
+  })
+
+  it('uses fallback-show-all when nothing is online', () => {
+    const webcasts = [
+      {
+        id: 'event:youtube:bar',
+        platform: 'youtube' as const,
+        channel: 'bar',
+        eventKey: 'event',
+        eventName: 'Event',
+        label: 'Event · YouTube',
+        embedUrl: 'https://www.youtube.com/embed/bar?autoplay=1&rel=0',
+        externalUrl: 'https://www.youtube.com/watch?v=bar',
+        availability: 'offline' as const,
+        availabilityCheckedAt: '2026-04-17T00:00:00.000Z',
+      },
+      {
+        id: 'event:twitch:foo',
+        platform: 'twitch' as const,
+        channel: 'foo',
+        eventKey: 'event',
+        eventName: 'Event',
+        label: 'Event · Twitch',
+        embedUrl: 'https://player.twitch.tv/?channel=foo',
+        externalUrl: 'https://twitch.tv/foo',
+        availability: 'unknown' as const,
+        availabilityCheckedAt: null,
+      },
+    ]
+
+    const visible = deriveVisibleWebcastSet(webcasts)
+
+    expect(visible.mode).toBe('fallback-show-all')
+    expect(visible.options).toHaveLength(2)
+    expect(visible.hasAnyOnline).toBe(false)
+    expect(visible.hasProbeFailures).toBe(false)
+  })
+
+  it('flags probe failures when youtube status is unknown', () => {
+    const webcasts = [
+      {
+        id: 'event:youtube:bar',
+        platform: 'youtube' as const,
+        channel: 'bar',
+        eventKey: 'event',
+        eventName: 'Event',
+        label: 'Event · YouTube',
+        embedUrl: 'https://www.youtube.com/embed/bar?autoplay=1&rel=0',
+        externalUrl: 'https://www.youtube.com/watch?v=bar',
+        availability: 'unknown' as const,
+        availabilityCheckedAt: null,
+      },
+    ]
+
+    const visible = deriveVisibleWebcastSet(webcasts)
+
+    expect(visible.mode).toBe('fallback-show-all')
+    expect(visible.hasProbeFailures).toBe(true)
   })
 })
