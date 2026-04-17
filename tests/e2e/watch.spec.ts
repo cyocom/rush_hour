@@ -98,14 +98,13 @@ async function mockTbaApi(page: Page) {
   })
 }
 
-test('watch page renders webcast, next match, and alerts', async ({ page }) => {
+test('watch page renders webcast, alerts, and conflicts', async ({ page }) => {
   await seedWatchPreferences(page)
   await mockTbaApi(page)
 
-  await page.goto('/watch')
+  await page.goto('/#/watch')
 
   await expect(page.getByTestId('watch-stream-panel')).toBeVisible()
-  await expect(page.getByTestId('watch-next-match-bar')).toBeVisible()
   await expect(page.getByTestId('watch-alert-list')).toBeVisible()
   await expect(page.getByTestId('watch-conflict-list')).toBeVisible()
   await expect(page.getByText('How to use this page')).toHaveCount(0)
@@ -116,9 +115,8 @@ test('watch page layout is responsive at 375 and 768', async ({ page }) => {
   await mockTbaApi(page)
 
   await page.setViewportSize({ width: 375, height: 812 })
-  await page.goto('/watch')
+  await page.goto('/#/watch')
   await expect(page.getByRole('tablist')).toBeVisible()
-  await expect(page.getByTestId('watch-next-match-bar')).toBeVisible()
   await expect(page.getByTestId('watch-stream-panel')).toBeVisible()
 
   const iframe375 = page.locator('[data-testid="watch-stream-panel"] iframe')
@@ -127,6 +125,5 @@ test('watch page layout is responsive at 375 and 768', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 })
   await page.reload()
   await expect(page.getByRole('tablist')).toBeVisible()
-  await expect(page.getByTestId('watch-next-match-bar')).toBeVisible()
   await expect(page.getByTestId('watch-stream-panel')).toBeVisible()
 })

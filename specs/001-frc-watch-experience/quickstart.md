@@ -14,7 +14,7 @@ Validate tracked-team configuration and watch-page alerts/conflicts using local 
 
 ## Manual Validation Flow
 1. Navigate to `/config`.
-2. Add three valid teams (example: `frc254`, `frc1678`, `frc1114`).
+2. Add three valid teams (example: `254`, `1678`, `1114`).
 3. Reorder teams so priority visibly changes.
 4. Remove one team and verify contiguous priority order remains.
 5. Navigate to `/watch`.
@@ -51,7 +51,7 @@ Validate the planned behavior for tracked-team configuration and watch-page aler
 
 ## Manual Validation Flow
 1. Navigate to `/config`.
-2. Add three valid teams (example: `frc254`, `frc1678`, `frc1114`).
+2. Add three valid teams (example: `254`, `1678`, `1114`).
 3. Reorder teams so priority visibly changes.
 4. Remove one team and verify contiguous priority order remains.
 5. Navigate to `/watch`.

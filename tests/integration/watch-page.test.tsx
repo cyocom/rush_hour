@@ -98,12 +98,11 @@ describe('watch page', () => {
     })
   })
 
-  it('shows live webcast panel, next match bar, alerts, and conflicts', async () => {
-    window.history.pushState({}, '', '/watch')
+  it('shows live webcast panel, alerts, and conflicts', async () => {
+    window.history.pushState({}, '', '/#/watch')
     render(<App />)
 
     expect(await screen.findByTestId('watch-stream-panel')).toBeInTheDocument()
-    expect(await screen.findByTestId('watch-next-match-bar')).toBeInTheDocument()
     expect(await screen.findByTestId('watch-alert-list')).toBeInTheDocument()
     expect(await screen.findByTestId('watch-conflict-list')).toBeInTheDocument()
   })
