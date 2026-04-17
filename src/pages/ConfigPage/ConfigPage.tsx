@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { PageShell } from '../../components/layout/PageShell'
 import { StatusCard } from '../../components/status/StatusCard'
@@ -7,6 +7,7 @@ import { TeamInputForm } from '../../components/teams/TeamInputForm'
 import { useWatchPreferences } from '../../app/watchPreferencesContext'
 import { normalizeTeamId, validateTeamInput } from '../../domain/validation/teams'
 import { readPersistentPreferences, writePersistentPreferences } from '../../domain/services/persistentPreferences'
+import { buildShareUrl } from '../../domain/services/shareUrl'
 
 const Main = styled.main`
   display: grid;
@@ -215,9 +216,55 @@ const Bullet = styled.li`
   color: rgb(79 75 69);
 `;
 
+const ShareBody = styled(Body)`
+  margin: 0 0 16px;
+`;
+
+const ShareActionButton = styled(ActionButton)`
+  width: 100%;
+`;
+
+const ShareDisabledHint = styled(StatusIndicator)`
+  margin-top: 12px;
+`;
+
+const ShareControlStack = styled.div`
+  display: grid;
+  gap: 12px;
+`;
+
+const ShareCheckboxLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgb(79 75 69);
+`;
+
+const ShareUrlInput = styled.input`
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgb(202 192 180);
+  background: rgb(255 255 255 / 0.9);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #0a0a0a;
+`;
+
+const ShareFeedback = styled.p<{ $error?: boolean }>`
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: ${({ $error }) => ($error ? 'rgb(178 34 34)' : 'rgb(27 132 88)')};
+`;
+
 export function ConfigPage() {
   const { trackedTeams, addTeam, removeTeam, reorderTeam } = useWatchPreferences()
   const [error, setError] = useState<string | null>(null)
+  const [includeApiKeyInShare, setIncludeApiKeyInShare] = useState(false)
+  const [shareFeedback, setShareFeedback] = useState<{ message: string; error?: boolean } | null>(null)
+  const shareUrlInputRef = useRef<HTMLInputElement | null>(null)
 
   // ── Simulation clock state (US2) ──────────────────────────────────────────
   const [simEnabled, setSimEnabled] = useState(false)
@@ -229,6 +276,7 @@ export function ConfigPage() {
   // ── TBA API key state (US3) ───────────────────────────────────────────────
   const [tbaKeyInput, setTbaKeyInput] = useState('')
   const [tbaKeyConfigured, setTbaKeyConfigured] = useState(false)
+  const [persistedTbaApiKey, setPersistedTbaApiKey] = useState<string | null>(null)
 
   // Load persisted preferences on mount
   useEffect(() => {
@@ -239,6 +287,8 @@ export function ConfigPage() {
     setSimStartedAtISOString(prefs.simulationClock.startedAtISOString)
     setTbaKeyInput(prefs.tbaApiKey ? `${prefs.tbaApiKey.slice(0, 6)}…` : '')
     setTbaKeyConfigured(!!prefs.tbaApiKey)
+    setPersistedTbaApiKey(prefs.tbaApiKey ?? null)
+    setIncludeApiKeyInShare(!!prefs.tbaApiKey)
   }, [])
 
   useEffect(() => {
@@ -362,10 +412,38 @@ export function ConfigPage() {
   function handleTbaKeySave() {
     // If input looks like a masked display value (ends with …), don't overwrite
     if (tbaKeyInput.endsWith('…')) return
-    writePersistentPreferences({ tbaApiKey: tbaKeyInput.trim() })
-    setTbaKeyConfigured(!!tbaKeyInput.trim())
-    if (tbaKeyInput.trim()) {
-      setTbaKeyInput(`${tbaKeyInput.trim().slice(0, 6)}…`)
+    const trimmed = tbaKeyInput.trim()
+    writePersistentPreferences({ tbaApiKey: trimmed })
+    setTbaKeyConfigured(!!trimmed)
+    setPersistedTbaApiKey(trimmed || null)
+    setIncludeApiKeyInShare(!!trimmed)
+    if (trimmed) {
+      setTbaKeyInput(`${trimmed.slice(0, 6)}…`)
+    }
+  }
+
+  const shareUrl = trackedTeams.length
+    ? buildShareUrl(
+      trackedTeams.map((team) => team.teamId),
+      persistedTbaApiKey,
+      includeApiKeyInShare,
+    )
+    : ''
+
+  async function handleCopyShareUrl() {
+    if (!shareUrl) return
+
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setShareFeedback({ message: 'Copied to clipboard.' })
+      window.setTimeout(() => setShareFeedback(null), 2000)
+    } catch {
+      if (shareUrlInputRef.current) {
+        shareUrlInputRef.current.focus()
+        shareUrlInputRef.current.select()
+      }
+      setShareFeedback({ message: 'Clipboard blocked. Select the URL and press Cmd+C.', error: true })
+      window.setTimeout(() => setShareFeedback(null), 3000)
     }
   }
 
@@ -517,6 +595,47 @@ export function ConfigPage() {
             >
               {tbaKeyConfigured ? 'Key configured' : 'No key set'}
             </StatusIndicator>
+          </Panel>
+
+          {/* ── Share Configuration ────────────────────────── */}
+          <Panel>
+            <SectionTitle>Share configuration</SectionTitle>
+            <ShareBody>
+              Generate a shareable URL with your teams and TBA API key to quickly onboard teammates.
+            </ShareBody>
+            <ShareControlStack>
+              {persistedTbaApiKey && (
+                <ShareCheckboxLabel>
+                  <input
+                    type="checkbox"
+                    checked={includeApiKeyInShare}
+                    onChange={(e) => setIncludeApiKeyInShare(e.target.checked)}
+                  />
+                  Include TBA API key in URL
+                </ShareCheckboxLabel>
+              )}
+              <ShareUrlInput
+                ref={shareUrlInputRef}
+                type="text"
+                value={shareUrl}
+                readOnly
+                placeholder="Add teams to generate a share URL"
+              />
+              <ShareActionButton
+                onClick={handleCopyShareUrl}
+                disabled={trackedTeams.length === 0}
+              >
+                Copy Share URL
+              </ShareActionButton>
+              {shareFeedback && (
+                <ShareFeedback $error={shareFeedback.error}>{shareFeedback.message}</ShareFeedback>
+              )}
+            </ShareControlStack>
+            {trackedTeams.length === 0 && (
+              <ShareDisabledHint $active={false}>
+                Add teams first to enable sharing
+              </ShareDisabledHint>
+            )}
           </Panel>
         </RightColumn>
       </Main>

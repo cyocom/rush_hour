@@ -5,7 +5,7 @@ import { App } from '../../src/app/App'
 describe('config page', () => {
   beforeEach(() => {
     sessionStorage.clear()
-    window.history.pushState({}, '', '/config')
+    window.history.pushState({}, '', '/#/config')
   })
 
   it('adds and removes teams', () => {

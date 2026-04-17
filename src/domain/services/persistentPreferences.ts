@@ -7,7 +7,16 @@ import {
 } from '../models/schedule'
 
 function hasLocalStorage(): boolean {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return false
+  }
+
+  const storage = window.localStorage as unknown as {
+    getItem?: unknown
+    setItem?: unknown
+  }
+
+  return typeof storage.getItem === 'function' && typeof storage.setItem === 'function'
 }
 
 export function readPersistentPreferences(): AppPersistentPreferences {

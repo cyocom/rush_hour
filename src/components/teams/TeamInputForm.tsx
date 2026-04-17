@@ -29,7 +29,7 @@ export function TeamInputForm({ error, onSubmit }: TeamInputFormProps) {
           value={teamId}
           onChange={(event) => setTeamId(event.target.value)}
           className="rh-input"
-          placeholder="frc254"
+          placeholder="254"
         />
         <button
           type="submit"

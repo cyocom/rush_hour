@@ -1,12 +1,14 @@
 # RUSHhour Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-13
+Auto-generated from all feature plans. Last updated: 2026-04-17
 
 ## Active Technologies
 - TypeScript ~6.0 + React 19, React Router 7, Tailwind CSS, styled-components 6, date-fns 4, Vite 8 (002-run-git-feature-hook)
 - `localStorage` (cross-session: subscribed teams, sim clock, TBA API key, response cache); `sessionStorage` (existing in-session watch preferences — unchanged) (002-run-git-feature-hook)
 - TypeScript ~6.0 + React 19, React Router 7, styled-components 6, Tailwind CSS, date-fns 4, Vite 8 (003-watch-page-integration)
 - `localStorage` (subscribed teams, simulation clock, TBA API key, response cache) (003-watch-page-integration)
+- TypeScript ~6.0 + React 19, React Router 7 (`createHashRouter`), Tailwind CSS, styled-components 6, date-fns 4, Vite 8 (004-shareable-config-url)
+- `localStorage` via existing `writePersistentPreferences` service — no new storage keys (004-shareable-config-url)
 
 - (002-run-git-feature-hook)
 
@@ -26,10 +28,10 @@ tests/
 : Follow standard conventions
 
 ## Recent Changes
+- 004-shareable-config-url: Added TypeScript ~6.0 + React 19, React Router 7 (`createHashRouter`), Tailwind CSS, styled-components 6, date-fns 4, Vite 8
 - 003-watch-page-integration: Added TypeScript ~6.0 + React 19, React Router 7, styled-components 6, Tailwind CSS, date-fns 4, Vite 8
 - 002-run-git-feature-hook: Added TypeScript ~6.0 + React 19, React Router 7, Tailwind CSS, styled-components 6, date-fns 4, Vite 8
 
-- 002-run-git-feature-hook: Added
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

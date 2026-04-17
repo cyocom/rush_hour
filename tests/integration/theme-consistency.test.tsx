@@ -4,11 +4,11 @@ import { App } from '../../src/app/App'
 
 describe('theme consistency', () => {
   it('renders shared shell on watch and config routes', () => {
-    window.history.pushState({}, '', '/watch')
+    window.history.pushState({}, '', '/#/watch')
     const { rerender } = render(<App />)
     expect(screen.getByText(/Rushhour Watchdesk/i)).toBeInTheDocument()
 
-    window.history.pushState({}, '', '/config')
+    window.history.pushState({}, '', '/#/config')
     rerender(<App />)
     expect(screen.getByText(/Rushhour Watchdesk/i)).toBeInTheDocument()
   })
