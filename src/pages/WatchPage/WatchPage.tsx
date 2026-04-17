@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { ConflictList } from '../../components/alerts/ConflictList'
@@ -9,7 +9,8 @@ import { WebcastPanel } from '../../components/stream/WebcastPanel'
 import { WebcastSelector } from '../../components/stream/WebcastSelector'
 import { computeConflictMatchKeys, toMatchConflicts } from '../../domain/services/scheduleBuilder'
 import { deriveNextMatch, useWatchPageData } from '../../domain/services/watchPage'
-import { getEffectiveTime, readPersistentPreferences } from '../../domain/services/persistentPreferences'
+import { getEffectiveTime } from '../../domain/services/persistentPreferences'
+import { useWatchPreferences } from '../../app/watchPreferencesContext'
 import type { UpcomingMatchAlert } from '../../domain/models/watch'
 import type { NextMatchInfo, ScheduledMatchEntry } from '../../domain/models/schedule'
 
@@ -41,13 +42,30 @@ const ActionLink = styled(Link)`
 `
 
 const AUTO_SWITCH_WINDOW_SECONDS = 5 * 60
+const MIN_STICKY_AFTER_START_SECONDS = 5 * 60
 const HIGHER_PRIORITY_HOLD_SECONDS = 10 * 60
+
+type AutoSwitchReason =
+  | 'no-candidates'
+  | 'initial-pick'
+  | 'sticky-after-start-guard'
+  | 'awaiting-score-post'
+  | 'higher-priority-within-window'
+  | 'no-upcoming-within-window'
+  | 'lower-priority-blocked-by-hold'
+  | 'switch-to-earliest-within-window'
+
+interface AutoSwitchDecision {
+  entry: ScheduledMatchEntry | null
+  reason: AutoSwitchReason
+  trace: string[]
+}
 
 function formatTimeToMatch(predictedTime: number | null, effectiveUnix: number): string {
   if (predictedTime === null) return 'Time TBD'
 
   const diffSeconds = predictedTime - effectiveUnix
-  if (diffSeconds <= 0) return 'In progress'
+  if (diffSeconds <= 0) return 'Upcoming'
 
   const totalMinutes = Math.ceil(diffSeconds / 60)
   if (totalMinutes < 60) return `Starts in ${totalMinutes}m`
@@ -66,7 +84,7 @@ function toNextMatchInfo(entry: ScheduledMatchEntry, effectiveUnix: number): Nex
   const minutesUntil = Math.max(0, Math.floor(diffSeconds / 60))
 
   if (diffSeconds <= 0 && !entry.isPlayed) {
-    return { status: 'in-progress', entry, minutesUntil: 0 }
+    return { status: 'upcoming', entry, minutesUntil: 0 }
   }
 
   return {
@@ -92,54 +110,91 @@ function chooseAutoShownEntry(
   effectiveUnix: number,
   currentShownMatchId: string | null,
   teamPriorityById: Record<string, number>,
-): ScheduledMatchEntry | null {
+): AutoSwitchDecision {
+  const trace: string[] = []
   const candidates = entries.filter(
     (entry) => entry.subscribedTeamsInMatch.length > 0 && !entry.isPlayed,
   )
+  trace.push(`candidates=${candidates.length}`)
 
-  if (candidates.length === 0) return null
+  if (candidates.length === 0) {
+    trace.push('exit:no-candidates')
+    return { entry: null, reason: 'no-candidates', trace }
+  }
 
   const current = currentShownMatchId
     ? candidates.find((entry) => entry.matchKey === currentShownMatchId) ?? null
     : null
+  trace.push(`currentShownMatchId=${currentShownMatchId ?? 'null'}`)
+  trace.push(`currentCandidate=${current?.matchKey ?? 'null'}`)
 
   if (!current) {
-    return candidates[0]
+    trace.push(`initial-pick=${candidates[0].matchKey}`)
+    return { entry: candidates[0], reason: 'initial-pick', trace }
   }
 
   const currentPriority = getEntryPriority(current, teamPriorityById)
+  const stickyUntil =
+    current.predictedTime !== null ? current.predictedTime + MIN_STICKY_AFTER_START_SECONDS : null
   const currentHoldUntil =
     current.predictedTime !== null ? current.predictedTime + HIGHER_PRIORITY_HOLD_SECONDS : null
+  trace.push(`currentPriority=${currentPriority}`)
+  trace.push(`currentPredictedTime=${current.predictedTime ?? 'null'}`)
+  trace.push(`stickyUntil=${stickyUntil ?? 'null'}`)
+  trace.push(`currentHoldUntil=${currentHoldUntil ?? 'null'}`)
+
+  if (stickyUntil !== null && effectiveUnix < stickyUntil) {
+    trace.push(`sticky-guard-hit effectiveUnix=${effectiveUnix}`)
+    return { entry: current, reason: 'sticky-after-start-guard', trace }
+  }
+
+  // After match start, keep the stream on the current match until TBA
+  // reports it as played (scores/results posted).
+  if (current.predictedTime !== null && effectiveUnix >= current.predictedTime) {
+    trace.push(`awaiting-score-post effectiveUnix=${effectiveUnix}`)
+    return { entry: current, reason: 'awaiting-score-post', trace }
+  }
 
   const upcomingWithinWindow = candidates.filter((entry) => {
     if (entry.matchKey === current.matchKey || entry.predictedTime === null) return false
     const secondsUntil = entry.predictedTime - effectiveUnix
     return secondsUntil >= 0 && secondsUntil <= AUTO_SWITCH_WINDOW_SECONDS
   })
+  trace.push(
+    `upcomingWithinWindow=${upcomingWithinWindow
+      .map((entry) => `${entry.matchKey}(p=${getEntryPriority(entry, teamPriorityById)})`)
+      .join(',') || 'none'}`,
+  )
 
   const higherPriorityWithinWindow = upcomingWithinWindow.find(
     (entry) => getEntryPriority(entry, teamPriorityById) < currentPriority,
   )
 
   if (higherPriorityWithinWindow) {
-    return higherPriorityWithinWindow
+    trace.push(`higher-priority-hit=${higherPriorityWithinWindow.matchKey}`)
+    return { entry: higherPriorityWithinWindow, reason: 'higher-priority-within-window', trace }
   }
 
   const earliestWithinWindow = upcomingWithinWindow[0] ?? null
   if (!earliestWithinWindow) {
-    return current
+    trace.push('exit:no-upcoming-within-window')
+    return { entry: current, reason: 'no-upcoming-within-window', trace }
   }
 
   const earliestPriority = getEntryPriority(earliestWithinWindow, teamPriorityById)
+  trace.push(`earliestWithinWindow=${earliestWithinWindow.matchKey}`)
+  trace.push(`earliestPriority=${earliestPriority}`)
   if (
     earliestPriority > currentPriority &&
     currentHoldUntil !== null &&
     effectiveUnix < currentHoldUntil
   ) {
-    return current
+    trace.push('exit:lower-priority-blocked-by-hold')
+    return { entry: current, reason: 'lower-priority-blocked-by-hold', trace }
   }
 
-  return earliestWithinWindow
+  trace.push('exit:switch-to-earliest-within-window')
+  return { entry: earliestWithinWindow, reason: 'switch-to-earliest-within-window', trace }
 }
 
 const WATCH_EVENT_SELECTIONS_STORAGE_KEY = 'rushhour.watch.eventWebcastSelections.v1'
@@ -157,13 +212,23 @@ function readEventWebcastSelections(): Record<string, string> {
 }
 
 export function WatchPage() {
+  const { trackedTeams } = useWatchPreferences()
   const { loadStatus, schedule, webcasts, selectedWebcastId, noApiKey, noSubscribedTeams } =
     useWatchPageData()
+  const [, setClockTick] = useState(0)
   const [selectedQueuedMatchId, setSelectedQueuedMatchId] = useState<string | null>(null)
   const [autoShownMatchId, setAutoShownMatchId] = useState<string | null>(null)
   const [eventWebcastSelections, setEventWebcastSelections] = useState<Record<string, string>>(
     () => readEventWebcastSelections(),
   )
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClockTick((tick) => tick + 1)
+    }, 15_000)
+
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -179,7 +244,7 @@ export function WatchPage() {
 
   const effectiveDate = getEffectiveTime()
   const effectiveUnix = Math.floor(effectiveDate.getTime() / 1000)
-  const teamPriorityById = readPersistentPreferences().subscribedTeams.reduce<Record<string, number>>(
+  const teamPriorityById = trackedTeams.reduce<Record<string, number>>(
     (accumulator, team, index) => {
       accumulator[team.teamId] = index
       return accumulator
@@ -188,19 +253,59 @@ export function WatchPage() {
   )
   const entries = schedule?.entries ?? []
   const queuedEntries = entries.slice(0, 3)
-  const autoShownEntry = chooseAutoShownEntry(
+  const autoSwitchDecision = chooseAutoShownEntry(
     entries,
     effectiveUnix,
     autoShownMatchId,
     teamPriorityById,
   )
+  const autoShownEntry = autoSwitchDecision.entry
+  const previousAutoShownMatchIdRef = useRef<string | null>(null)
+  const autoShownMatchKey = autoShownEntry?.matchKey ?? null
 
   useEffect(() => {
-    setAutoShownMatchId(autoShownEntry?.matchKey ?? null)
-  }, [autoShownEntry?.matchKey])
+    const previous = previousAutoShownMatchIdRef.current
+    const next = autoShownMatchKey
+
+    // Always log decision at verbose level
+    console.debug('[WatchPage][verbose] Auto stream decision', {
+      reason: autoSwitchDecision.reason,
+      from: previous,
+      to: next,
+      effectiveUnix,
+      trace: autoSwitchDecision.trace,
+      queue: queuedEntries.map((entry) => ({
+        key: entry.matchKey,
+        event: entry.eventKey,
+        predictedTime: entry.predictedTime,
+        isPlayed: entry.isPlayed,
+        teams: entry.subscribedTeamsInMatch,
+      })),
+    })
+
+    // Log warning when match actually changes
+    if (previous !== next) {
+      console.warn('[WatchPage] Stream switched', {
+        reason: autoSwitchDecision.reason,
+        from: previous,
+        to: next,
+      })
+    }
+
+    previousAutoShownMatchIdRef.current = autoShownMatchKey
+    setAutoShownMatchId(autoShownMatchKey)
+  }, [
+    autoShownMatchKey,
+    autoSwitchDecision.reason,
+    effectiveUnix,
+    queuedEntries,
+  ])
 
   useEffect(() => {
     if (selectedQueuedMatchId && !queuedEntries.some((entry) => entry.matchKey === selectedQueuedMatchId)) {
+      if (import.meta.env.DEV) {
+        console.log('[WatchPage] Clearing manual selection; match no longer in queue:', selectedQueuedMatchId)
+      }
       setSelectedQueuedMatchId(null)
     }
   }, [queuedEntries, selectedQueuedMatchId])
@@ -275,7 +380,7 @@ export function WatchPage() {
     urgency: (() => {
       if (!entry.predictedTime) return 'upcoming' as const
       const diffMin = Math.floor((entry.predictedTime - effectiveUnix) / 60)
-      if (diffMin <= 0) return 'now' as const
+      if (diffMin <= 0) return 'upcoming' as const
       if (diffMin <= 15) return 'soon' as const
       return 'upcoming' as const
     })(),
@@ -284,7 +389,7 @@ export function WatchPage() {
   }))
 
   const conflictKeys = computeConflictMatchKeys(entries)
-  const conflicts = toMatchConflicts(conflictKeys, entries)
+  const conflicts = toMatchConflicts(conflictKeys, entries, teamPriorityById)
   const nextThreeMatchKeys = new Set(entries.slice(0, 3).map((entry) => entry.matchKey))
   const visibleConflicts = conflicts.filter((conflict) =>
     conflict.impactedMatchIds.some((matchId) => nextThreeMatchKeys.has(matchId)),
